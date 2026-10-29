@@ -378,5 +378,62 @@
    }
   ],
   "note": "Unambiguous continuity: the answer (Friday, Nov 6) is only in the Dana thread's history."
+ },
+ {
+  "id": "emails_job_3d",
+  "category": "email_queries",
+  "turns": [
+   {
+    "text": "Any job-related emails from the last 3 days?",
+    "expect_text": [
+     "interview",
+     "intro call"
+    ],
+    "forbid_text": [
+     "verification code",
+     "newsletter",
+     "budget",
+     "flight"
+    ]
+   }
+  ],
+  "note": "Meaning-based filter over a code-resolved window. Mock inbox: job-related are the Priya interview (5h) and Frank intro call (50h)."
+ },
+ {
+  "id": "emails_summary_default",
+  "category": "email_queries",
+  "turns": [
+   {
+    "text": "Summarize my emails",
+    "expect_text": [
+     "lunch"
+    ],
+    "forbid_text": [
+     "interview",
+     "flight",
+     "budget",
+     "github"
+    ]
+   }
+  ],
+  "note": "No window named: default last 4 hours (mock inbox has the lunch invite at 3h and the Stripe code at 1h only)."
+ },
+ {
+  "id": "emails_last_2h",
+  "category": "email_queries",
+  "turns": [
+   {
+    "text": "What came in during the last 2 hours?",
+    "expect_text": [
+     "verification"
+    ],
+    "forbid_text": [
+     "lunch",
+     "interview",
+     "budget"
+    ]
+   }
+  ],
+  "note": "Relative range: only the Stripe verification email (1h old) qualifies."
  }
 ]

@@ -15,3 +15,16 @@ from server.experiments.report import _outcome
 ])
 def test_outcome_classification(spawned, expected, asked, outcome):
     assert _outcome(spawned, expected, asked) == outcome
+
+
+def _turn(reply, expect=None, forbid=None, final=""):
+    return {"final_response": final, "replies": [{"text": reply}], "expect_text": expect, "forbid_text": forbid}
+
+
+def test_content_check_requires_expected_and_no_forbidden():
+    from server.experiments.report import _content_ok
+
+    assert _content_ok(_turn("Priya's Interview scheduling email", ["interview"], ["newsletter"])) == 1
+    assert _content_ok(_turn("interview and a newsletter", ["interview"], ["newsletter"])) == 0
+    assert _content_ok(_turn("nothing relevant", ["interview"], [])) == 0
+    assert _content_ok(_turn("anything")) is None

@@ -7,6 +7,7 @@ Writes in <run_dir>: summary.md (per-category + per-scenario + breakdowns), turn
 import csv
 import json
 import sys
+from typing import Optional
 from collections import defaultdict
 from pathlib import Path
 
@@ -77,6 +78,14 @@ def _outcome(spawned: set, expected: set, asked: bool) -> str:
     return "wrong" if not (spawned & expected) else "partial"
 
 
+def _content_ok(t: dict) -> Optional[int]:
+    """1 if every expected phrase appears in the reply and no forbidden one does; None when unlabelled."""
+    if not t.get("expect_text") and not t.get("forbid_text"):
+        return None
+    text = " ".join([t.get("final_response") or ""] + [r["text"] for r in t["replies"]]).lower()
+    return int(all(p.lower() in text for p in t.get("expect_text") or []) and not any(p.lower() in text for p in t.get("forbid_text") or []))
+
+
 def collect(run_dir: Path):
     turn_rows, call_rows, tool_rows = [], [], []
     for sub in sorted(p for p in run_dir.iterdir() if p.is_dir()):
@@ -111,7 +120,7 @@ def collect(run_dir: Path):
             routed = None if expected is None else int(outcome in ("routed", "no_agent") or (outcome == "asked" and bool(t.get("accept_ask"))))
             turn_rows.append({
                 "variant": info.get("variant", "baseline"), "n": info.get("n"),
-                "expect_agent": expect, "routed_correct": routed, "outcome": outcome,
+                "expect_agent": expect, "routed_correct": routed, "outcome": outcome, "content_ok": _content_ok(t),
                 "duplicate_agent": int(any(a not in seeded for a in spawned)) if seeded else None,
                 "category": t.get("category", "legacy"), "scenario": t["scenario"], "run": sub.name, "turn": t["turn"], "request_id": rid,
                 "message": t["message"],
@@ -257,6 +266,12 @@ def main() -> None:
                          _agg([r["interaction_prompt_tokens"] for r in rs], "mean"), _agg([r["cost_usd"] for r in rs], "mean"),
                          _agg([r["total_s"] for r in rs], "p50"), _agg([r["llm_calls"] for r in rs], "mean")])
         md += ["## N-sweep", "", _table(["variant", "N", "turns", "routing acc", "duplicate agent rate", "inter prompt tok", "$/turn", "total p50 s", "llm calls"], rows), ""]
+
+    # Content checks: did the reply contain what it should and nothing it should not
+    checked = [r for r in turn_rows if r["content_ok"] is not None]
+    if checked:
+        md += ["## Content checks", "", _table(["variant", "scenario", "passed", "llm calls", "$", "total s", "tools used"],
+              [[r["variant"], r["scenario"], "yes" if r["content_ok"] else "NO", r["llm_calls"], r["cost_usd"], r["total_s"], r["tools_used"]] for r in checked]), ""]
 
     # worst offenders
     worst = sorted(turn_rows, key=lambda r: -r["cost_usd"])[:10]
