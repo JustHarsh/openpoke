@@ -31,7 +31,7 @@ DEFAULT_MAX_RESULTS = 10
 DEFAULT_SEEN_LIMIT = 300
 
 
-_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+from server.paths import DATA_DIR as _DATA_DIR
 _DEFAULT_SEEN_PATH = _DATA_DIR / "gmail_seen.json"
 
 
