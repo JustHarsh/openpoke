@@ -13,7 +13,7 @@ from ....utils.timezones import now_in_user_timezone
 from .state import LogEntry, SummaryState
 
 
-_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
+from server.paths import DATA_DIR as _DATA_DIR
 _WORKING_MEMORY_LOG_PATH = _DATA_DIR / "conversation" / "poke_working_memory.log"
 
 
