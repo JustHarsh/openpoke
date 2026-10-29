@@ -27,6 +27,7 @@ from .schemas import (
     get_completion_schema,
 )
 from .system_prompt import get_system_prompt
+from server.utils.time_windows import parse_window
 
 # Constants
 MAX_LLM_ITERATIONS = 8
@@ -287,6 +288,11 @@ async def _perform_search(
     composio_user_id: str,
 ) -> EmailSearchToolResult:
     query = (arguments.get("query") or "").strip()
+    if within := (arguments.get("within") or "").strip():
+        try:
+            query = f"{query} {parse_window(within)}".strip()
+        except ValueError as exc:
+            return EmailSearchToolResult(status="error", error=str(exc))
     if not query:
         logger.warning(f"[EMAIL_SEARCH] Search called with empty query")
         return EmailSearchToolResult(

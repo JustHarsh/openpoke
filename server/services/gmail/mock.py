@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -33,12 +34,29 @@ def enabled() -> bool:
     return os.getenv("OPENPOKE_MOCK_GMAIL") == "1"
 
 
+def _time_bounds(query: str, now: datetime):
+    """(after, before) as datetimes from `after:<epoch>`, `before:<epoch>` and `newer_than:Nh|Nd`."""
+    after = before = None
+    if m := re.search(r"\bafter:(\d{9,})", query):
+        after = datetime.fromtimestamp(int(m.group(1)), timezone.utc)
+    if m := re.search(r"\bbefore:(\d{9,})", query):
+        before = datetime.fromtimestamp(int(m.group(1)), timezone.utc)
+    if m := re.search(r"\bnewer_than:(\d+)([hdm])", query):
+        unit = {"h": "hours", "d": "days", "m": "minutes"}[m.group(2)]
+        after = now - timedelta(**{unit: int(m.group(1))})
+    return after, before
+
+
 def _messages(query: str, max_results: int) -> List[Dict[str, Any]]:
     now = datetime.now(timezone.utc)
+    after, before = _time_bounds(query or "", now)
     words = [w.lower() for w in (query or "").split() if ":" not in w and w.lower() not in {"or", "and"}]
     out: List[Dict[str, Any]] = []
     for mid, tid, sender, subject, body, hours, labels in _INBOX:
         if mid == "m9" and os.getenv("OPENPOKE_MOCK_GMAIL_INJECT") != "1":
+            continue
+        sent_at = now - timedelta(hours=hours)
+        if (after and sent_at < after) or (before and sent_at >= before):
             continue
         haystack = f"{sender} {subject} {body}".lower()
         if words and not any(w.strip("()\"") in haystack for w in words):

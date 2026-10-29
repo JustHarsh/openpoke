@@ -29,6 +29,10 @@ GMAIL_FETCH_EMAILS_SCHEMA = {
                     "minimum": 1,
                     "maximum": 100,
                 },
+                "within": {
+                    "type": "string",
+                    "description": "Relative time range such as '15 minutes', '3 hours', '2 days', 'today', 'yesterday', 'this week'. The system turns it into an exact Gmail filter; use this instead of writing after:/newer_than: yourself.",
+                },
                 "include_spam_trash": {
                     "type": "boolean",
                     "description": "Include spam and trash messages. Default: false.",

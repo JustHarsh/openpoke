@@ -3,6 +3,7 @@
 import json
 from typing import Any, Callable, Dict, List, Optional
 
+from ....utils.time_windows import render_time_context
 from ....services.tasks.approval import check_can_send, enter_pending_approval, mark_sent
 from ....services.tasks.store import Task, TaskStore
 from ....services.tasks.transitions import ALLOWED, advance
@@ -24,7 +25,7 @@ def render_task_context(task: Task) -> str:
         "thread_id": task.thread_id, "summary": task.summary, "data": task.data,
     }
     allowed = sorted(ALLOWED[task.kind].get(task.status, set()))
-    return f"{TASK_RULES}\n\n## Task record\n{json.dumps(record, indent=2, default=str)}\nStatuses you may move to: {allowed}"
+    return f"{TASK_RULES}\n\n## Time\n{render_time_context()}\n\n## Task record\n{json.dumps(record, indent=2, default=str)}\nStatuses you may move to: {allowed}"
 
 
 def get_schemas() -> List[Dict[str, Any]]:

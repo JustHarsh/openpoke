@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from server.utils.time_windows import render_time_context
+
 
 def get_system_prompt() -> str:
     """Generate system prompt with today's date for Gmail search assistant."""
@@ -15,6 +17,7 @@ def get_system_prompt() -> str:
         f"## Current Context:\n"
         f"- Today's date: {today}\n"
         f"- Use this date as reference for relative time queries (e.g., 'recent', 'today', 'this week')\n"
+        f"{render_time_context(search_tool=True)}\n"
         "\n"
         "## Available Tools:\n"
         "- `gmail_fetch_emails`: Search Gmail using advanced search parameters\n"
