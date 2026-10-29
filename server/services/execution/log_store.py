@@ -12,7 +12,7 @@ from ...logging_config import logger
 from ...utils.timezones import now_in_user_timezone
 
 
-_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+from server.paths import DATA_DIR as _DATA_DIR
 _EXECUTION_LOG_DIR = _DATA_DIR / "execution_agents"
 
 
