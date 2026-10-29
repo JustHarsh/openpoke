@@ -16,7 +16,7 @@ if TYPE_CHECKING:  # pragma: no cover - used for type checkers only
     from .summarization import WorkingMemoryLog
 
 
-_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+from server.paths import DATA_DIR as _DATA_DIR
 _CONVERSATION_LOG_PATH = _DATA_DIR / "conversation" / "poke_conversation.log"
 
 
