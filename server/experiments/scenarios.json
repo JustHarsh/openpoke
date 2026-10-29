@@ -386,8 +386,8 @@
    {
     "text": "Any job-related emails from the last 3 days?",
     "expect_text": [
-     "interview",
-     "intro call"
+     "priya",
+     "frank"
     ],
     "forbid_text": [
      "verification code",
@@ -397,7 +397,7 @@
     ]
    }
   ],
-  "note": "Meaning-based filter over a code-resolved window. Mock inbox: job-related are the Priya interview (5h) and Frank intro call (50h)."
+  "note": "Meaning-based filter over a code-resolved window. Mock inbox: job-related are Priya's interview scheduling (5h) and Frank's interview follow-up (50h). Checked by sender name, since models word the subject differently."
  },
  {
   "id": "emails_summary_default",
