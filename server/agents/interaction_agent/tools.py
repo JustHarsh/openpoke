@@ -5,9 +5,12 @@ import json
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from ...config import get_settings
 from ...logging_config import logger
 from ...services.conversation import get_conversation_log
 from ...services.execution import get_agent_roster, get_execution_agent_logs
+from ...services.tasks.retrieval import find_tasks
+from ...services.tasks.store import get_task_store
 from ..execution_agent.batch_manager import ExecutionBatchManager
 
 
@@ -105,6 +108,24 @@ TOOL_SCHEMAS = [
     },
 ]
 
+# Only exposed under the redesign variant, where the roster is replaced by stored tasks
+FIND_TASKS_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "find_tasks",
+        "description": "Search stored tasks (email threads, lookups) relevant to the user's message. Call this before starting new work, and for follow-ups like 'did Priya reply?'. Results are ranked; if several top results share a score but name different people, ask the user which one they mean.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Names and topics from the user's message."},
+                "kind": {"type": "string", "enum": ["email_thread", "email_lookup", "other"], "description": "Optional filter."},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+}
+
 _EXECUTION_BATCH_MANAGER = ExecutionBatchManager()
 
 
@@ -189,6 +210,28 @@ def send_draft(
     )
 
 
+# Look up stored tasks relevant to a message; flags a tie at the top so the agent can ask the user
+def find_tasks_tool(query: str, kind: Optional[str] = None) -> ToolResult:
+    """Return the best-matching stored tasks, best first."""
+    results = find_tasks(get_task_store(), query, kind=kind, limit=5)
+    top = results[0][1] if results else 0.0
+    tied = [task for task, score in results if score == top] if top > 0 else []
+    return ToolResult(
+        success=True,
+        payload={
+            "tasks": [
+                {
+                    "id": task.id, "kind": task.kind, "status": task.status, "entities": task.entities,
+                    "summary": task.summary, "thread_id": task.thread_id, "updated_at": task.updated_at,
+                    "score": round(score, 2),
+                }
+                for task, score in results
+            ],
+            "ambiguous": len(tied) > 1 and len({tuple(t.entities) for t in tied}) > 1,
+        },
+    )
+
+
 # Record silent wait state to avoid duplicate responses
 def wait(reason: str) -> ToolResult:
     """Wait silently and add a wait log entry that is not visible to the user."""
@@ -211,6 +254,8 @@ def wait(reason: str) -> ToolResult:
 # Return predefined tool schemas for LLM function calling
 def get_tool_schemas():
     """Return OpenAI-compatible tool schemas."""
+    if get_settings().variant == "redesign":
+        return [*TOOL_SCHEMAS, FIND_TASKS_SCHEMA]
     return TOOL_SCHEMAS
 
 
@@ -233,6 +278,8 @@ def handle_tool_call(name: str, arguments: Any) -> ToolResult:
             return send_draft(**args)
         if name == "wait":
             return wait(**args)
+        if name == "find_tasks":
+            return find_tasks_tool(**args)
 
         logger.warning("unexpected tool", extra={"tool": name})
         return ToolResult(success=False, payload={"error": f"Unknown tool: {name}"})
