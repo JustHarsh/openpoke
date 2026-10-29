@@ -6,6 +6,7 @@ Status: draft for approval. Due Monday, Nov 2. Replaces `PLAN.md`.
 Every execution agent ever created is listed in the interaction agent's prompt on every request. Prompt size, cost and routing errors grow with the number of past agents (N). Fix this, prove the fix with tests and evaluators, and flag other gaps found along the way.
 
 ## Goals
+- Parity: the redesign supports everything the baseline supports for email (search, summaries, drafts, send, forward, reply, contacts), plus time windows and meaning-based filters. Reminders are the exception (out of scope, below).
 - Prompt size, cost and routing accuracy stay flat as N grows.
 - Continuity is kept: "Did Priya reply?" works weeks later.
 - Tests and evaluators show, with numbers, that it works and where it does not.
@@ -47,9 +48,9 @@ Whether 2 beats 1 is what the evaluators decide. Where 2 is neutral or worse (sm
 **Variants.** An env switch selects `baseline`, `topk` or `redesign`, so the same scenarios run against all three.
 
 ## Query behavior (decided)
-- **"Summarize my emails":** code sets the default window (unread plus last 24h, capped). The reply states the window and any truncation.
+- **Default window:** when a query names no time window ("summarize my emails"), code applies the last 4 hours. The reply states the window and any truncation.
 - **"What did Priya say?":** if more than one person matches, ask which one. One match: answer and name them.
-- **"Job-related emails today?":** "today" is since local midnight in the user's timezone. One cheap LLM call (Haiku, `EMAIL_FILTER_MODEL`) classifies the day's emails, batched.
+- **Filtering by meaning ("job-related emails today?", "anything about my trip?"):** Gmail operators cannot express it. The subagent fetches the window's emails, then one cheap LLM call (Haiku, `EMAIL_FILTER_MODEL`) returns the ids matching any criterion, batched. "Today" is since local midnight in the user's timezone. Job-related is the example probe, not the only supported criterion.
 - **"Last 4 hours":** the search prompt only knows the date. Relative windows are resolved in code (`newer_than:Nh`) and passed to the search.
 
 ## Testing
@@ -77,7 +78,7 @@ Not included: the article's reminder and nightly-summary queries (recurring task
 - k = 5, tuned in the sweep.
 - Closed `kind` set of three values.
 - SQLite in the data dir.
-- 24h default summary window, capped.
+- 4h default window when none is given (decided by the user).
 
 ## Risks
 - A retrieval miss is worse than a visible roster, so routing accuracy is measured, not assumed.
@@ -93,3 +94,10 @@ Not included: the article's reminder and nightly-summary queries (recurring task
 
 ## Left to the builder
 Exact column types, retrieval scoring weights, scenario wording, report layout.
+
+## Out of scope, for the record: reminders and recurring tasks
+Probably not reached. Notes in case it is:
+- **Conflict:** triggers are owned by an agent name (`agent_name` in `services/triggers/store.py`) and a firing trigger wakes that agent. The redesign has no standing agents, so a trigger would have nobody to wake.
+- **Path:** add a `reminder` task kind (statuses such as `active`, `paused`, `done`). Keep the schedule in `triggers.db` but point each trigger at a `task_id`. On fire, spawn an ephemeral subagent seeded from that task. "What reminders do I have?" becomes `find_tasks(kind="reminder")`.
+- **Changes needed:** a `task_id` column on triggers, the `reminder` kind in `transitions.py`, the scheduler's fire path, and the execution agent's trigger tools taking a `task_id`. About a day of work.
+- **Possible later cleanup:** fold the trigger table into `tasks` (one store, one lifecycle). Not now: `TriggerService` computes RRULE next-fire times and completion, so removing `triggers.db` means porting working logic outside this assignment, and a diff that deletes a subsystem is harder to review.
