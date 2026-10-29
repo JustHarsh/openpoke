@@ -60,10 +60,10 @@ def test_unknown_ids_are_dropped_and_json_may_be_wrapped(store, monkeypatch):
 
 
 @pytest.mark.parametrize("failure", [dict(content="not json at all"), dict(error=RuntimeError("OpenRouter 500"))])
-def test_falls_back_to_lexical_matching_on_failure(store, monkeypatch, failure):
+def test_failures_are_raised_not_hidden(store, monkeypatch, failure):
     _fake(monkeypatch, **failure)
-    results, ambiguous = _run(store, "Did Alice reply?")
-    assert ambiguous is None and {t.id for t, _ in results} == {1, 2}
+    with pytest.raises(Exception):
+        _run(store, "Did Alice reply?")
 
 
 def test_empty_store_makes_no_llm_call(tmp_path, monkeypatch):

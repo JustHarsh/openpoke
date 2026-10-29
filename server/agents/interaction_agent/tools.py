@@ -282,11 +282,11 @@ def send_draft(
 # Look up stored tasks relevant to a message; flags ambiguity so the agent can ask the user
 async def find_tasks_tool(query: str, kind: Optional[str] = None) -> ToolResult:
     """Return the best-matching stored tasks, best first (chosen by one cheap LLM call)."""
-    results, ambiguous = await find_tasks_llm(get_task_store(), query, kind=kind, limit=5)
-    if ambiguous is None:  # lexical fallback: ambiguous when the top results tie across different people
-        top = results[0][1] if results else 0.0
-        tied = [task for task, score in results if score == top] if top > 0 else []
-        ambiguous = len(tied) > 1 and len({tuple(t.entities) for t in tied}) > 1
+    try:
+        results, ambiguous = await find_tasks_llm(get_task_store(), query, kind=kind, limit=5)
+    except Exception as exc:  # no silent fallback: tell the agent the lookup failed
+        logger.error("find_tasks failed", extra={"error": str(exc)})
+        return ToolResult(success=False, payload={"error": f"Task lookup failed ({exc}). Retry once, or tell the user and ask them to repeat the request."})
     return ToolResult(
         success=True,
         payload={

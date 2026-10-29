@@ -51,11 +51,13 @@ def test_passes_through_the_matchers_ambiguity_flag(store, monkeypatch):
     assert _call({"query": "Did Priya reply?"}).payload["ambiguous"] is True
 
 
-def test_lexical_fallback_computes_ambiguity_from_ties(store, monkeypatch):
-    a = store.create("email_thread", entities=["Priya Nair"])
-    b = store.create("email_thread", entities=["Priya Wong"])
-    _matcher(monkeypatch, lambda s: [(a, 1.0), (b, 1.0)], None)  # None = fallback was used
-    assert _call({"query": "Did Priya reply?"}).payload["ambiguous"] is True
+def test_matcher_failure_becomes_a_tool_error(store, monkeypatch):
+    async def boom(*args, **kwargs):
+        raise RuntimeError("OpenRouter 500")
+
+    monkeypatch.setattr(tools, "find_tasks_llm", boom)
+    result = _call({"query": "Did Priya reply?"})
+    assert not result.success and "Task lookup failed" in result.payload["error"]
 
 
 def test_no_match_returns_empty(store, monkeypatch):

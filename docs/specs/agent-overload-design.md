@@ -27,7 +27,7 @@ Cron and recurring tasks, MCP, per-category databases, UI changes, background em
 - Five days. Delivered as a PR from the user's branch.
 
 ## Approaches considered
-1. **Top-k roster retrieval on the old architecture.** Keep persistent agents, list only the k most relevant in the prompt. Smallest change. Kept as the `topk` ablation variant, not the answer: agent logs still grow and are still reloaded in full on reuse.
+1. **Top-k roster retrieval on the old architecture.** Keep persistent agents, list only the k most relevant in the prompt. Smallest change. Checked only in a small test (not swept): agent logs still grow and are still reloaded in full on reuse.
 2. **Task store plus ephemeral subagents (chosen).** State lives in records, agents are short-lived. Fixes prompt growth, log growth and gives a place to enforce approval in code.
 3. **One agent, prompt only, no new code.** Rejected: nothing persists or retrieves state, and "the model handles it" is unmeasured.
 
@@ -39,7 +39,7 @@ Whether 2 beats 1 is what the evaluators decide. Where 2 is neutral or worse (sm
 - `kind` is a closed set: `email_thread`, `email_lookup`, `other`. A closed set stops the model inventing near-duplicate labels.
 - `email_thread` statuses: `drafting`, `pending_approval`, `sent` (sent, waiting for a reply), `replied`, `closed`. Sending is reachable only from `pending_approval`, enforced in code. A closed thread can be reopened by a late reply (`closed -> replied`), and a follow-up goes `replied -> drafting`. A failed send leaves the task in `pending_approval` and the error goes in `data`; there is no `failed` status.
 
-**Retrieval.** `find_tasks(query, kind?, limit)` returns the top-k records, scored on entities and summary. Replaces the roster in the prompt.
+**Retrieval.** `find_tasks(query, kind?)` is one isolated cheap-model call (Haiku, `TASK_MATCHER_MODEL`) that reads every task summary and returns up to 5 matches plus an ambiguity flag, so typos, nicknames and paraphrases need no special code. It replaces the roster in the prompt. The prompt stays flat in N, but the call's own input grows with N (about 50 tokens per task); a shortlist in front of it would make it flat and is the documented alternative. If the call fails the tool reports an error; there is no silent fallback.
 
 **Subagents.** The existing execution runtime, short-lived, seeded from task records instead of a persistent agent log.
 
@@ -54,7 +54,7 @@ Whether 2 beats 1 is what the evaluators decide. Where 2 is neutral or worse (sm
 - **"Last 4 hours":** the search prompt only knows the date. Relative windows are resolved in code (`newer_than:Nh`) and passed to the search.
 
 ## Testing
-- **Tests (pytest, no LLM):** state machine rejects invalid transitions and approval cannot be skipped; retrieval finds the right record among 200, including ambiguous names; prompt size does not grow with stored tasks.
+- **Tests (pytest, no LLM):** state machine rejects invalid transitions and approval cannot be skipped; `find_tasks` is tested with a fake model (parsing, ambiguity flag, failures surface as errors); prompt size does not grow with stored tasks. Whether the real model picks the right task is measured by the probes, not unit tests.
 - **Evaluators:** N-sweep at N = 0, 10, 50, 200 for each variant with labelled probes; metrics are prompt tokens, cost, latency, LLM and tool calls, agents spawned, routing accuracy. Also spawn policy (no spawn for chitchat or lookups), injection safety (injected inbox never triggers a send), job-filter precision and recall, time-window correctness on a mock Gmail that honors time operators.
 - **Harness:** reuse `server/experiments` (isolated data, mock Gmail, report).
 
@@ -74,7 +74,7 @@ Not included: the article's reminder and nightly-summary queries (recurring task
 `wait` spam, search_email fan-out (20+ LLM calls per email turn), 8-iteration cap failure, prompt injection. Already fixed: hidden error logging, dead model slugs, Gmail 413 in the watcher.
 
 ## Calls I made (override any)
-- Keyword and entity scoring for retrieval, not embeddings (cheap, deterministic, no extra API).
+- LLM task matching over all stored tasks instead of embeddings or a lexical scorer (decided with the user: the model should handle linguistic queries itself; less code).
 - k = 5, tuned in the sweep.
 - Closed `kind` set of three values.
 - SQLite in the data dir.

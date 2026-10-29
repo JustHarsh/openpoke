@@ -1,17 +1,15 @@
 """find_tasks backed by one cheap, isolated LLM call that reads every stored task.
 
 The interaction agent's prompt stays flat in N (it only sees the matches), but this call reads all N
-task summaries, so its cost grows with N. A lexical shortlist in front of it (see retrieval.py)
-would make it flat; that is the documented alternative.
+task summaries, so its cost grows with N. A cheap shortlist in front of it would make it flat; that is
+the documented alternative, not built.
 """
 
 import json
 from typing import List, Optional, Tuple
 
 from ...config import get_settings
-from ...logging_config import logger
 from ...openrouter_client import request_chat_completion
-from .retrieval import find_tasks as lexical_find_tasks
 from .store import Task, TaskStore
 
 _CONFIDENCE = {"high": 1.0, "medium": 0.6, "low": 0.3}
@@ -43,21 +41,17 @@ def _parse(text: str, valid_ids: set, limit: int) -> Tuple[List[Tuple[int, float
 
 async def find_tasks_llm(
     store: TaskStore, query: str, kind: Optional[str] = None, limit: int = 5
-) -> Tuple[List[Tuple[Task, float]], Optional[bool]]:
-    """Return ((task, score) pairs, ambiguous). ambiguous is None when the lexical fallback was used."""
+) -> Tuple[List[Tuple[Task, float]], bool]:
+    """Return ((task, score) pairs, ambiguous). Raises if the call or its JSON fails; the caller reports it."""
     tasks = store.list_tasks(kind=kind, limit=100_000)  # newest first
     if not tasks:
         return [], False
     by_id = {t.id: t for t in tasks}
-    try:
-        response = await request_chat_completion(
-            model=get_settings().task_matcher_model,
-            system=_SYSTEM % limit,
-            messages=[{"role": "user", "content": f"<message>{query}</message>\n<tasks>\n" + "\n".join(map(_line, tasks)) + "\n</tasks>"}],
-            purpose="task_matcher",
-        )
-        matches, ambiguous = _parse(response["choices"][0]["message"]["content"], set(by_id), limit)
-        return [(by_id[i], score) for i, score in matches], ambiguous
-    except Exception as exc:  # fall back rather than fail the turn
-        logger.warning("task matcher failed, using lexical fallback", extra={"error": str(exc)})
-        return lexical_find_tasks(store, query, kind=kind, limit=limit), None
+    response = await request_chat_completion(
+        model=get_settings().task_matcher_model,
+        system=_SYSTEM % limit,
+        messages=[{"role": "user", "content": f"<message>{query}</message>\n<tasks>\n" + "\n".join(map(_line, tasks)) + "\n</tasks>"}],
+        purpose="task_matcher",
+    )
+    matches, ambiguous = _parse(response["choices"][0]["message"]["content"], set(by_id), limit)
+    return [(by_id[i], score) for i, score in matches], ambiguous
