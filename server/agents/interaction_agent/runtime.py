@@ -1,5 +1,6 @@
 """Interaction Agent Runtime - handles LLM calls for user and agent turns."""
 
+import inspect
 import json
 import time
 from dataclasses import dataclass, field
@@ -168,7 +169,7 @@ class InteractionAgentRuntime:
             for tool_call in parsed_tool_calls:
                 summary.tool_names.append(tool_call.name)
 
-                result = self._execute_tool(tool_call)
+                result = await self._execute_tool(tool_call)
 
                 if tool_call.name == "send_message_to_agent" and isinstance(result.payload, dict):
                     agent_name = result.payload.get("agent_name")
@@ -287,7 +288,7 @@ class InteractionAgentRuntime:
         return {}, f"unsupported argument type: {type(raw_arguments).__name__}"
 
     # Execute tool calls with error handling and logging, returning standardized results
-    def _execute_tool(self, tool_call: _ToolCall) -> ToolResult:
+    async def _execute_tool(self, tool_call: _ToolCall) -> ToolResult:
         """Execute a tool call and convert low-level errors into structured results."""
 
         if "__invalid_arguments__" in tool_call.arguments:
@@ -299,6 +300,8 @@ class InteractionAgentRuntime:
             self._log_tool_invocation(tool_call, stage="start")
             started = time.perf_counter()
             result = handle_tool_call(tool_call.name, tool_call.arguments)
+            if inspect.isawaitable(result):  # async tools such as find_tasks
+                result = await result
             record_tool_call(
                 agent="interaction_agent",
                 tool=tool_call.name,

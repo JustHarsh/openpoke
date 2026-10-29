@@ -9,7 +9,7 @@ from ...config import get_settings
 from ...logging_config import logger
 from ...services.conversation import get_conversation_log
 from ...services.execution import get_agent_roster, get_execution_agent_logs
-from ...services.tasks.retrieval import find_tasks
+from ...services.tasks.llm_retrieval import find_tasks_llm
 from ...services.tasks.store import get_task_store
 from ...services.tasks.transitions import KINDS
 from ..execution_agent.batch_manager import ExecutionBatchManager
@@ -279,12 +279,14 @@ def send_draft(
     )
 
 
-# Look up stored tasks relevant to a message; flags a tie at the top so the agent can ask the user
-def find_tasks_tool(query: str, kind: Optional[str] = None) -> ToolResult:
-    """Return the best-matching stored tasks, best first."""
-    results = find_tasks(get_task_store(), query, kind=kind, limit=5)
-    top = results[0][1] if results else 0.0
-    tied = [task for task, score in results if score == top] if top > 0 else []
+# Look up stored tasks relevant to a message; flags ambiguity so the agent can ask the user
+async def find_tasks_tool(query: str, kind: Optional[str] = None) -> ToolResult:
+    """Return the best-matching stored tasks, best first (chosen by one cheap LLM call)."""
+    results, ambiguous = await find_tasks_llm(get_task_store(), query, kind=kind, limit=5)
+    if ambiguous is None:  # lexical fallback: ambiguous when the top results tie across different people
+        top = results[0][1] if results else 0.0
+        tied = [task for task, score in results if score == top] if top > 0 else []
+        ambiguous = len(tied) > 1 and len({tuple(t.entities) for t in tied}) > 1
     return ToolResult(
         success=True,
         payload={
@@ -296,7 +298,7 @@ def find_tasks_tool(query: str, kind: Optional[str] = None) -> ToolResult:
                 }
                 for task, score in results
             ],
-            "ambiguous": len(tied) > 1 and len({tuple(t.entities) for t in tied}) > 1,
+            "ambiguous": ambiguous,
         },
     )
 
