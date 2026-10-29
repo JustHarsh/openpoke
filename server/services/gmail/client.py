@@ -13,6 +13,7 @@ from ...config import Settings, get_settings
 from ...logging_config import logger
 from ...models import GmailConnectPayload, GmailDisconnectPayload, GmailStatusPayload
 from ...utils import error_response
+from . import mock as _mock
 
 
 _CLIENT_LOCK = threading.Lock()
@@ -36,6 +37,8 @@ def _set_active_gmail_user_id(user_id: Optional[str]) -> None:
 
 
 def get_active_gmail_user_id() -> Optional[str]:
+    if _mock.enabled():
+        return _mock.MOCK_USER_ID
     with _ACTIVE_USER_ID_LOCK:
         return _ACTIVE_USER_ID
 
@@ -477,6 +480,9 @@ def execute_gmail_tool(
                 prepared_arguments[key] = value
 
     prepared_arguments.setdefault("user_id", "me")
+
+    if _mock.enabled():
+        return _mock.execute(tool_name, prepared_arguments)
 
     try:
         client = _get_composio_client()
