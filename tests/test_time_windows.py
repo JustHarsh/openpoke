@@ -90,3 +90,10 @@ def test_mock_gmail_honors_epoch_and_newer_than():
     assert _ids(f"after:{four_hours_ago}") == {"m1", "m2"}  # sent 3h and 1h ago
     assert _ids("newer_than:2h") == {"m2"}
     assert _ids(f"after:{four_hours_ago - 7200 * 3} before:{four_hours_ago}") >= {"m3"}
+
+
+def test_mock_messages_carry_a_body_the_cleaner_can_read():
+    from server.services.gmail.processing import parse_gmail_fetch_response
+
+    emails, _ = parse_gmail_fetch_response({"data": {"messages": mock._messages("lunch", 5)}}, query="lunch")
+    assert emails and "Chez Philippe" in emails[0].clean_text
