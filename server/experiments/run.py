@@ -6,6 +6,7 @@ Each scenario run gets its own data dir (no shared state, no real Gmail). Then: 
 
 import argparse
 import json
+import threading
 import os
 import subprocess
 import sys
@@ -40,8 +41,17 @@ def _run_one(run_dir: Path, scenario_id: str, rep: int, n, variant: str, extra_e
         env=env, capture_output=True, text=True,
     )
     (out / "stderr.log").write_text(proc.stderr)
-    print(f"  {scenario_id} r{rep}: exit={proc.returncode} {time.monotonic() - started:.0f}s", flush=True)
-    return {"scenario": scenario_id, "rep": rep, "exit": proc.returncode}
+    cost = _run_cost(out)
+    print(f"  {scenario_id} {variant} n={n} r{rep}: exit={proc.returncode} {time.monotonic() - started:.0f}s ${cost:.3f}", flush=True)
+    return {"scenario": scenario_id, "rep": rep, "exit": proc.returncode, "cost": cost}
+
+
+# Dollars spent by one scenario run, from its own usage log
+def _run_cost(out: Path) -> float:
+    log = out / "data" / "usage" / "llm_calls.jsonl"
+    if not log.exists():
+        return 0.0
+    return sum(json.loads(l).get("cost_usd") or 0 for l in log.read_text().splitlines() if l.strip())
 
 
 def main() -> None:
@@ -51,6 +61,7 @@ def main() -> None:
     ap.add_argument("--repeats", type=int, default=1)
     ap.add_argument("--parallel", type=int, default=1)
     ap.add_argument("--variants", default="baseline", help="comma list: baseline,topk,redesign")
+    ap.add_argument("--max-cost", type=float, default=None, help="stop starting new runs once this many dollars have been spent")
     ap.add_argument("--sweep-n", default="", help="comma list of roster sizes to seed, e.g. 0,10,50,200")
     a = ap.parse_args()
 
@@ -82,10 +93,25 @@ def main() -> None:
 
     variants = a.variants.split(",")
     ns = [int(x) for x in a.sweep_n.split(",")] if a.sweep_n else [None]
-    jobs = [(s, r, n, v) for r in range(a.repeats) for v in variants for n in ns for s in chosen]
+    # variants vary fastest, so a spending cap cuts the tail evenly instead of dropping a whole variant
+    jobs = [(s, r, n, v) for r in range(a.repeats) for s in chosen for n in ns for v in variants]
     print(f"{run_dir.name}: {len(jobs)} runs, parallel={a.parallel}")
+    spent = {"total": 0.0}
+    lock = threading.Lock()
+
+    def job(j):
+        with lock:
+            if a.max_cost is not None and spent["total"] >= a.max_cost:
+                return None  # cap reached: skip the remaining runs
+        result = _run_one(run_dir, j[0], j[1], j[2], j[3], envs[j[0]])
+        with lock:
+            spent["total"] += result["cost"]
+        return result
+
     with ThreadPoolExecutor(max_workers=a.parallel) as pool:
-        list(pool.map(lambda j: _run_one(run_dir, j[0], j[1], j[2], j[3], envs[j[0]]), jobs))
+        results = list(pool.map(job, jobs))
+    skipped = sum(r is None for r in results)
+    print(f"spent ${spent['total']:.2f}" + (f"; cap reached, skipped {skipped} of {len(jobs)} runs" if skipped else ""))
     print(f"done. python -m server.experiments.report {run_dir}")
 
 
