@@ -7,7 +7,7 @@ from .service import TriggerService
 from .store import TriggerStore
 
 
-_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+from server.paths import DATA_DIR as _DATA_DIR
 _default_db_path = _DATA_DIR / "triggers.db"
 _trigger_store = TriggerStore(_default_db_path)
 _trigger_service = TriggerService(_trigger_store)
