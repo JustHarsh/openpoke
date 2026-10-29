@@ -68,7 +68,7 @@ class Settings(BaseModel):
     docs_url: Optional[str] = Field(default=os.getenv("OPENPOKE_DOCS_URL", "/docs"))
 
     # Summarisation controls
-    conversation_summary_threshold: int = Field(default=100)
+    conversation_summary_threshold: int = Field(default=int(os.getenv("OPENPOKE_SUMMARY_THRESHOLD", "100")))
     conversation_summary_tail_size: int = Field(default=10)
 
     @property
