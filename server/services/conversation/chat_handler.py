@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from ...agents.interaction_agent.runtime import InteractionAgentRuntime
 from ...logging_config import logger
 from ...models import ChatMessage, ChatRequest
+from ...openrouter_client.usage import current_request_id, new_request_id, record_request
 from ...utils import error_response
 
 
@@ -38,7 +39,11 @@ async def handle_chat_request(payload: ChatRequest) -> Union[PlainTextResponse, 
         logger.error("configuration error", extra={"error": str(ve)})
         return error_response(str(ve), status_code=status.HTTP_400_BAD_REQUEST)
 
+    request_id = new_request_id()
+    record_request(request_id, user_content)
+
     async def _run_interaction() -> None:
+        current_request_id.set(request_id)
         try:
             await runtime.execute(user_message=user_content)
         except Exception as exc:  # pragma: no cover - defensive

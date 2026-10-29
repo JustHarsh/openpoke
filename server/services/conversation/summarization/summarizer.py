@@ -35,6 +35,7 @@ async def _call_openrouter(prompt: SummaryPrompt, model: str, api_key: Optional[
                 model=model,
                 messages=prompt.messages,
                 system=prompt.system_prompt,
+                purpose="summarizer",
                 api_key=api_key,
             )
             choices = response.get("choices") or []

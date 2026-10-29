@@ -1,6 +1,7 @@
 """Interaction Agent Runtime - handles LLM calls for user and agent turns."""
 
 import json
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
@@ -9,6 +10,7 @@ from .tools import ToolResult, get_tool_schemas, handle_tool_call
 from ...config import get_settings
 from ...services.conversation import get_conversation_log, get_working_memory_log
 from ...openrouter_client import request_chat_completion
+from ...openrouter_client.usage import record_tool_call
 from ...logging_config import logger
 
 
@@ -216,6 +218,7 @@ class InteractionAgentRuntime:
             system=system_prompt,
             api_key=self.api_key,
             tools=self.tool_schemas,
+            purpose="interaction_agent",
         )
 
     # Extract the assistant's message from the OpenRouter API response structure
@@ -294,7 +297,15 @@ class InteractionAgentRuntime:
 
         try:
             self._log_tool_invocation(tool_call, stage="start")
+            started = time.perf_counter()
             result = handle_tool_call(tool_call.name, tool_call.arguments)
+            record_tool_call(
+                agent="interaction_agent",
+                tool=tool_call.name,
+                success=result.success,
+                duration_ms=int((time.perf_counter() - started) * 1000),
+                detail=tool_call.arguments.get("agent_name") if tool_call.name == "send_message_to_agent" else None,
+            )
         except Exception as exc:  # pragma: no cover - defensive
             logger.error(
                 "Tool execution crashed",

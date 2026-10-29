@@ -2,6 +2,7 @@
 
 import inspect
 import json
+import time
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 
@@ -9,6 +10,7 @@ from .agent import ExecutionAgent
 from .tools import get_tool_schemas, get_tool_registry
 from ...config import get_settings
 from ...openrouter_client import request_chat_completion
+from ...openrouter_client.usage import current_agent, record_tool_call
 from ...logging_config import logger
 
 
@@ -42,6 +44,7 @@ class ExecutionAgentRuntime:
     # Main execution loop for running agent with LLM calls and tool execution
     async def execute(self, instructions: str) -> ExecutionResult:
         """Execute the agent with given instructions."""
+        current_agent.set(self.agent.name)
         try:
             # Build system prompt with history
             system_prompt = self.agent.build_system_prompt_with_history()
@@ -158,7 +161,8 @@ class ExecutionAgentRuntime:
             messages=messages,
             system=system_prompt,
             api_key=self.api_key,
-            tools=tools_to_send
+            tools=tools_to_send,
+            purpose="execution_agent",
         )
 
     # Parse and validate tool calls from LLM response into structured format
@@ -227,10 +231,20 @@ class ExecutionAgentRuntime:
         if not tool_func:
             return False, {"error": f"Unknown tool: {tool_name}"}
 
+        started = time.perf_counter()
+        success = False
         try:
             result = tool_func(**arguments)
             if inspect.isawaitable(result):
                 result = await result
+            success = True
             return True, result
         except Exception as e:
             return False, {"error": str(e)}
+        finally:
+            record_tool_call(
+                agent=self.agent.name,
+                tool=tool_name,
+                success=success,
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
