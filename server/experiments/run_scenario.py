@@ -55,6 +55,7 @@ async def main(scenario_id: str, out_dir: Path, turn_timeout: float) -> None:
             message = turn["text"] if isinstance(turn, dict) else turn
             drain = turn.get("drain", True) if isinstance(turn, dict) else True
             expect_agent = turn.get("expect_agent") if isinstance(turn, dict) else None
+            accept_ask = bool(turn.get("accept_ask")) if isinstance(turn, dict) else False
             request_id = new_request_id()
             current_request_id.set(request_id)
             record_request(request_id, message)
@@ -77,6 +78,7 @@ async def main(scenario_id: str, out_dir: Path, turn_timeout: float) -> None:
                 "drained": drained,
                 "category": scenario["category"],
                 "expect_agent": expect_agent,
+                "accept_ask": accept_ask,
                 "seed_n": seed_n,
                 "first_pass_s": round(first_pass, 3),
                 "first_reply_s": round(replies[0][0] - started, 3) if replies else None,

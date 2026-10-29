@@ -269,7 +269,8 @@
   "turns": [
    {
     "text": "Did Alice reply yet?",
-    "expect_agent": "Email to Alice"
+    "expect_agent": "Email to Alice",
+    "accept_ask": true
    }
   ],
   "note": "Routing under overload: must reuse the existing 'Email to Alice' agent, not a near-duplicate or a new one. expect_agent 'NONE' means no agent should be spawned."
@@ -281,7 +282,8 @@
   "turns": [
    {
     "text": "Did Priya reply yet?",
-    "expect_agent": "Email to Priya"
+    "expect_agent": "Email to Priya",
+    "accept_ask": true
    }
   ],
   "note": "Reuse the right agent among near-duplicate names"
@@ -293,7 +295,8 @@
   "turns": [
    {
     "text": "What lunch is Alice talking about?",
-    "expect_agent": "Email to Alice"
+    "expect_agent": "Email to Alice",
+    "accept_ask": true
    }
   ],
   "note": "Follow-up answerable from the Alice agent's log (restaurant, time, Bob)"
@@ -305,7 +308,8 @@
   "turns": [
    {
     "text": "Is Bob confirmed for lunch?",
-    "expect_agent": "Email to Bob"
+    "expect_agent": "Email to Bob",
+    "accept_ask": true
    }
   ],
   "note": "Same lunch thread, other person; must not route to Alice"
@@ -317,7 +321,8 @@
   "turns": [
    {
     "text": "Email Alice that I'm running 10 minutes late",
-    "expect_agent": "Email to Alice"
+    "expect_agent": "Email to Alice",
+    "accept_ask": true
    }
   ],
   "note": "New request to a known contact must reuse the agent, not spawn a duplicate"
@@ -332,7 +337,8 @@
     "expect_agent": [
      "Email to Alice",
      "Email to Bob"
-    ]
+    ],
+    "accept_ask": true
    }
   ],
   "note": "Two contacts in one request: both existing agents, no new ones"
@@ -348,5 +354,29 @@
    }
   ],
   "note": "Small talk must not spawn or reuse any agent, at any N"
+ },
+ {
+  "id": "probe_reply_dana",
+  "category": "overload_probe",
+  "seed_n": 50,
+  "turns": [
+   {
+    "text": "Did Dana reply yet?",
+    "expect_agent": "Email to Dana"
+   }
+  ],
+  "note": "Unambiguous: no other Dana exists. Must continue the Dana thread, not ask and not start a new one."
+ },
+ {
+  "id": "probe_dana_deadline",
+  "category": "overload_probe",
+  "seed_n": 50,
+  "turns": [
+   {
+    "text": "What deadline did Dana give me for the contract?",
+    "expect_agent": "Email to Dana"
+   }
+  ],
+  "note": "Unambiguous continuity: the answer (Friday, Nov 6) is only in the Dana thread's history."
  }
 ]

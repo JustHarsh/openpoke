@@ -64,12 +64,26 @@ def _table(headers, rows) -> str:
     return "\n".join(out)
 
 
+def _outcome(spawned: set, expected: set, asked: bool) -> str:
+    """How a labelled turn went: routed | no_agent | asked | no_action | fanout | wrong | partial."""
+    if spawned == expected:
+        return "no_agent" if not expected else "routed"
+    if not spawned:
+        return "asked" if asked else "no_action"
+    if not expected:
+        return "wrong"
+    if expected < spawned:
+        return "fanout"
+    return "wrong" if not (spawned & expected) else "partial"
+
+
 def collect(run_dir: Path):
     turn_rows, call_rows, tool_rows = [], [], []
     for sub in sorted(p for p in run_dir.iterdir() if p.is_dir()):
         turns = _jsonl(sub / "turns.jsonl")
         info = json.loads((sub / "info.json").read_text()) if (sub / "info.json").exists() else {}
-        seeded = set(json.loads((sub / "seeded_roster.json").read_text())) if (sub / "seeded_roster.json").exists() else set()
+        seeded_order = json.loads((sub / "seeded_roster.json").read_text()) if (sub / "seeded_roster.json").exists() else []
+        seeded = set(seeded_order)
         usage = sub / "data" / "usage"
         calls, tools = defaultdict(list), defaultdict(list)
         by_turn = {t["request_id"]: t for t in turns}
@@ -90,10 +104,14 @@ def collect(run_dir: Path):
             inter_tools = [x for x in ts if x["agent"] == "interaction_agent"]
             expect = t.get("expect_agent")
             expected = None if expect is None else (set() if expect == "NONE" else set(expect) if isinstance(expect, list) else {expect})
-            routed = None if expected is None else int(set(spawned) == expected)
+            if expected and info.get("variant") == "redesign" and seeded_order:  # seeded task id = roster position + 1
+                expected = {f"task-{seeded_order.index(name) + 1}" for name in expected}
+            asked = "?" in " ".join([t.get("final_response") or ""] + [r["text"] for r in t["replies"]])
+            outcome = None if expected is None else _outcome(set(spawned), expected, asked)
+            routed = None if expected is None else int(outcome in ("routed", "no_agent") or (outcome == "asked" and bool(t.get("accept_ask"))))
             turn_rows.append({
                 "variant": info.get("variant", "baseline"), "n": info.get("n"),
-                "expect_agent": expect, "routed_correct": routed,
+                "expect_agent": expect, "routed_correct": routed, "outcome": outcome,
                 "duplicate_agent": int(any(a not in seeded for a in spawned)) if seeded else None,
                 "category": t.get("category", "legacy"), "scenario": t["scenario"], "run": sub.name, "turn": t["turn"], "request_id": rid,
                 "message": t["message"],

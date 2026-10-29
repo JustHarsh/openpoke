@@ -10,6 +10,7 @@ from pathlib import Path
 
 from server.services.execution.log_store import ExecutionAgentLogStore
 from server.services.execution.roster import AgentRoster
+from server.services.tasks.store import TaskStore
 
 # (agent name, original request, final response): the agents the labelled probes should route to.
 PROBE_AGENTS = [
@@ -19,6 +20,9 @@ PROBE_AGENTS = [
      "Sent to bob@hooli.com. Lunch at 12:30, Chez Philippe, with Alice."),
     ("Email to Priya", "Email Priya my availability for Thursday afternoon.",
      "Sent to priya@acme.io. Waiting for her reply."),
+    # No distractor shares this first name, so probes about Dana are unambiguous.
+    ("Email to Dana", "Email Dana about renewing the vendor contract.",
+     "Sent to dana@whitfield.io. She asked for the countersigned contract by Friday, Nov 6."),
 ]
 
 _FIRST = ["Alice", "Bob", "Priya", "Frank", "Maya", "Liam", "Noah", "Sofia", "Chen", "Omar", "Elena", "Raj", "Ana", "Tom"]
@@ -41,8 +45,21 @@ def _candidates(rng: random.Random):
             yield (f"Reply to {f} about {t}", f"Reply to {f} about {t}.", f"Drafted reply to {f} regarding {t}.")
 
 
+def _task_fields(name: str, response: str) -> tuple:
+    """(kind, entities, summary) of the stored task equivalent to a seeded agent."""
+    if name.startswith("Email to "):
+        return "email_thread", [name[len("Email to "):]], response
+    if name.startswith("Reply to "):
+        person, _, topic = name[len("Reply to "):].partition(" about ")
+        return "email_thread", [person, topic], response
+    return "email_lookup", [name.replace(" Restaurant Search", "").replace(" Analysis", "")], response
+
+
 def seed(data_dir: Path, n: int, seed_value: int = 0) -> list[str]:
-    """Write n agents (probe targets first guaranteed) to data_dir; returns the roster in order."""
+    """Write n agents (probe targets first guaranteed) to data_dir; returns the roster in order.
+
+    Also writes one stored task per agent (task id = roster position + 1) so the redesign variant has equivalent history.
+    """
     rng = random.Random(seed_value)
     pool = list(_candidates(rng))
     probe_names = {name for name, _, _ in PROBE_AGENTS}
@@ -54,10 +71,15 @@ def seed(data_dir: Path, n: int, seed_value: int = 0) -> list[str]:
 
     logs = ExecutionAgentLogStore(data_dir / "execution_agents")
     roster = AgentRoster(data_dir / "execution_agents" / "roster.json")
+    tasks = TaskStore(data_dir / "tasks.db")
     for name, request, response in chosen:
         logs.record_request(name, request)
         logs.record_agent_response(name, response)
         roster.add_agent(name)
+        kind, entities, summary = _task_fields(name, response)
+        task = tasks.create(kind, summary=summary, entities=entities)
+        if kind == "email_thread":
+            tasks.set_status(task.id, "sent")  # history: sent, waiting on a reply
     return roster.get_agents()
 
 

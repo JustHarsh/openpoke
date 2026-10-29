@@ -21,3 +21,14 @@ def test_seed_writes_logs_and_roster(tmp_path):
     roster = json.loads((tmp_path / "execution_agents" / "roster.json").read_text())
     assert roster == names
     assert len(list((tmp_path / "execution_agents").glob("*"))) == 21  # 20 logs + roster.json
+
+
+def test_seed_also_creates_matching_tasks(tmp_path):
+    from server.services.tasks.store import TaskStore
+
+    names = seed(tmp_path, 30)
+    tasks = TaskStore(tmp_path / "tasks.db").list_tasks(limit=100)
+    assert len(tasks) == 30
+    alice = names.index("Email to Alice") + 1  # task id = roster position + 1
+    task = TaskStore(tmp_path / "tasks.db").get(alice)
+    assert task.entities == ["Alice"] and task.status == "sent" and "Chez Philippe" in task.summary
