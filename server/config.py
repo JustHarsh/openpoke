@@ -63,6 +63,7 @@ class Settings(BaseModel):
     execution_agent_search_model: str = Field(default=os.getenv("EXECUTION_AGENT_SEARCH_MODEL", "anthropic/claude-sonnet-5.5"))
     summarizer_model: str = Field(default=os.getenv("SUMMARIZER_MODEL", "anthropic/claude-sonnet-5.5"))
     email_classifier_model: str = Field(default=os.getenv("EMAIL_CLASSIFIER_MODEL", "anthropic/claude-sonnet-5.5"))
+    email_filter_model: str = Field(default=os.getenv("EMAIL_FILTER_MODEL", "anthropic/claude-haiku-5.5"))  # filters fetched emails by meaning
     task_matcher_model: str = Field(default=os.getenv("TASK_MATCHER_MODEL", "anthropic/claude-haiku-5.5"))  # picks stored tasks for find_tasks
 
     # Credentials / integrations

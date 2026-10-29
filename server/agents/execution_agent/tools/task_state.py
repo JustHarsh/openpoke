@@ -15,7 +15,8 @@ You are a short-lived worker. Everything that persists about this work lives in 
 - Keep the record current with `update_task` (summary of what was done, entities such as people involved, thread_id, data with anything a later follow-up needs: draft text, message ids, the window searched).
 - When you have prepared a draft for the user to review, call `set_task_status` with `pending_approval`, report the exact draft, and stop. Do not send in the same run.
 - Send tools are blocked by the system until the user has replied since the draft was shown. If a send is refused, report that and stop.
-- After a send succeeds the system marks the task `sent` itself; do not set it."""
+- After a send succeeds the system marks the task `sent` itself; do not set it.
+- To find emails by meaning within a time range (job-related, about a trip, urgent, or a summary of recent mail) use `filter_emails`: it is much cheaper than `task_email_search`, which is for finding a specific known email."""
 
 
 # Render the task record as context for the subagent's system prompt
