@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 def _load_env_file() -> None:
@@ -39,6 +39,9 @@ def _env_int(name: str, fallback: int) -> int:
         return fallback
 
 
+VARIANTS = ("baseline", "topk", "redesign")
+
+
 class Settings(BaseModel):
     """Application settings with lightweight env fallbacks."""
 
@@ -49,6 +52,10 @@ class Settings(BaseModel):
     # Server runtime
     server_host: str = Field(default=os.getenv("OPENPOKE_HOST", "0.0.0.0"))
     server_port: int = Field(default=_env_int("OPENPOKE_PORT", 8001))
+
+    # Architecture variant under test: baseline | topk | redesign
+    variant: str = Field(default=os.getenv("OPENPOKE_VARIANT", "baseline"), validate_default=True)
+    topk_agents: int = Field(default=int(os.getenv("OPENPOKE_TOPK", "5")))  # roster size listed under the topk variant
 
     # LLM model selection
     interaction_agent_model: str = Field(default=os.getenv("INTERACTION_AGENT_MODEL", "anthropic/claude-sonnet-5.5"))
@@ -70,6 +77,13 @@ class Settings(BaseModel):
     # Summarisation controls
     conversation_summary_threshold: int = Field(default=int(os.getenv("OPENPOKE_SUMMARY_THRESHOLD", "100")))
     conversation_summary_tail_size: int = Field(default=10)
+
+    @field_validator("variant")
+    @classmethod
+    def _check_variant(cls, value: str) -> str:
+        if value not in VARIANTS:
+            raise ValueError(f"variant must be one of {VARIANTS}, got {value!r}")
+        return value
 
     @property
     def cors_allow_origins(self) -> List[str]:

@@ -4,7 +4,9 @@ from html import escape
 from pathlib import Path
 from typing import Dict, List
 
+from ...config import get_settings
 from ...services.execution import get_agent_roster
+from .roster_select import select_agents
 
 _prompt_path = Path(__file__).parent / "system_prompt.md"
 SYSTEM_PROMPT = _prompt_path.read_text(encoding="utf-8").strip()
@@ -26,7 +28,7 @@ def prepare_message_with_history(
     sections: List[str] = []
 
     sections.append(_render_conversation_history(transcript))
-    sections.append(f"<active_agents>\n{_render_active_agents()}\n</active_agents>")
+    sections.append(f"<active_agents>\n{_render_active_agents(latest_text)}\n</active_agents>")
     sections.append(_render_current_turn(latest_text, message_type))
 
     content = "\n\n".join(sections)
@@ -42,10 +44,14 @@ def _render_conversation_history(transcript: str) -> str:
 
 
 # Format currently active execution agents into XML tags for LLM awareness
-def _render_active_agents() -> str:
+def _render_active_agents(latest_text: str) -> str:
     roster = get_agent_roster()
     roster.load()
     agents = roster.get_agents()
+
+    settings = get_settings()
+    if settings.variant == "topk":
+        agents = select_agents(agents, latest_text, settings.topk_agents)
 
     if not agents:
         return "None"
