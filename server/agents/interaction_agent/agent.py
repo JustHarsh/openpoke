@@ -11,11 +11,18 @@ from .roster_select import select_agents
 _prompt_path = Path(__file__).parent / "system_prompt.md"
 SYSTEM_PROMPT = _prompt_path.read_text(encoding="utf-8").strip()
 
+# Redesign variant: swap the agent-routing section for task instructions
+_TASK_SECTION = (Path(__file__).parent / "system_prompt_tasks.md").read_text(encoding="utf-8").strip()
+_ROUTING_START = "Send Message to Agent Tool Usage"
+_ROUTING_END = "Send Message to User Tool Usage"
+_head, _, _rest = SYSTEM_PROMPT.partition(_ROUTING_START)
+TASK_SYSTEM_PROMPT = f"{_head}{_TASK_SECTION}\n\n{_ROUTING_END}{_rest.partition(_ROUTING_END)[2]}"
+
 
 # Load and return the pre-defined system prompt from markdown file
 def build_system_prompt() -> str:
     """Return the static system prompt for the interaction agent."""
-    return SYSTEM_PROMPT
+    return TASK_SYSTEM_PROMPT if get_settings().variant == "redesign" else SYSTEM_PROMPT
 
 
 # Build structured message with conversation history, active agents, and current turn
@@ -28,7 +35,8 @@ def prepare_message_with_history(
     sections: List[str] = []
 
     sections.append(_render_conversation_history(transcript))
-    sections.append(f"<active_agents>\n{_render_active_agents(latest_text)}\n</active_agents>")
+    if get_settings().variant != "redesign":  # redesign has no roster; tasks come from find_tasks
+        sections.append(f"<active_agents>\n{_render_active_agents(latest_text)}\n</active_agents>")
     sections.append(_render_current_turn(latest_text, message_type))
 
     content = "\n\n".join(sections)

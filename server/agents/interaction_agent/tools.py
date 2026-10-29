@@ -11,6 +11,7 @@ from ...services.conversation import get_conversation_log
 from ...services.execution import get_agent_roster, get_execution_agent_logs
 from ...services.tasks.retrieval import find_tasks
 from ...services.tasks.store import get_task_store
+from ...services.tasks.transitions import KINDS
 from ..execution_agent.batch_manager import ExecutionBatchManager
 
 
@@ -126,12 +127,80 @@ FIND_TASKS_SCHEMA = {
     },
 }
 
+# Redesign variant: work is tracked as stored tasks instead of named, long-lived agents
+SEND_TO_TASK_WORKER_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "send_message_to_agent",
+        "description": "Start a short-lived worker on a task. Pass task_id to continue an existing task (from find_tasks); otherwise a new task is created from kind and title.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "instructions": {"type": "string", "description": "What the worker should do. Say what, not how."},
+                "task_id": {"type": "integer", "description": "Continue this existing task."},
+                "kind": {"type": "string", "enum": list(KINDS), "description": "New tasks only. email_thread: writing to, replying to or forwarding to a person. email_lookup: searching, summarizing or filtering emails. other: anything else."},
+                "title": {"type": "string", "description": "New tasks only. One short line describing the task."},
+            },
+            "required": ["instructions"],
+            "additionalProperties": False,
+        },
+    },
+}
+
 _EXECUTION_BATCH_MANAGER = ExecutionBatchManager()
 
 
+# Create or continue a stored task and run an ephemeral worker on it (redesign variant)
+def _send_to_task_worker(
+    instructions: str, task_id: Optional[int] = None, kind: Optional[str] = None, title: Optional[str] = None
+) -> ToolResult:
+    store = get_task_store()
+    if task_id is not None:
+        task = store.get(task_id)
+        if task is None:
+            return ToolResult(success=False, payload={"error": f"No task with id {task_id}"})
+        is_new = False
+    else:
+        if kind not in KINDS:
+            return ToolResult(success=False, payload={"error": f"kind is required for a new task and must be one of {list(KINDS)}"})
+        task = store.create(kind, summary=(title or instructions)[:200])
+        is_new = True
+
+    worker = f"task-{task.id}"  # label only; nothing persists on the worker
+    logger.info(f"{'Created' if is_new else 'Continued'} task {task.id} ({task.kind})")
+
+    async def _execute_async() -> None:
+        try:
+            result = await _EXECUTION_BATCH_MANAGER.execute_agent(worker, instructions, task_id=task.id)
+            logger.info(f"Worker '{worker}' completed: {'SUCCESS' if result.success else 'FAILED'}")
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.error(f"Worker '{worker}' failed: {str(exc)}")
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return ToolResult(success=False, payload={"error": "No event loop available"})
+    loop.create_task(_execute_async())
+
+    return ToolResult(
+        success=True,
+        payload={"status": "submitted", "agent_name": worker, "task_id": task.id, "new_task_created": is_new},
+    )
+
+
 # Create or reuse execution agent and dispatch instructions asynchronously
-def send_message_to_agent(agent_name: str, instructions: str) -> ToolResult:
-    """Send instructions to an execution agent."""
+def send_message_to_agent(
+    agent_name: Optional[str] = None,
+    instructions: str = "",
+    task_id: Optional[int] = None,
+    kind: Optional[str] = None,
+    title: Optional[str] = None,
+) -> ToolResult:
+    """Send instructions to an execution agent (or, under redesign, to a worker on a stored task)."""
+    if get_settings().variant == "redesign":
+        return _send_to_task_worker(instructions, task_id, kind, title)
+    if not agent_name:
+        return ToolResult(success=False, payload={"error": "agent_name is required"})
     roster = get_agent_roster()
     roster.load()
     existing_agents = set(roster.get_agents())
@@ -255,7 +324,8 @@ def wait(reason: str) -> ToolResult:
 def get_tool_schemas():
     """Return OpenAI-compatible tool schemas."""
     if get_settings().variant == "redesign":
-        return [*TOOL_SCHEMAS, FIND_TASKS_SCHEMA]
+        swapped = [SEND_TO_TASK_WORKER_SCHEMA if t["function"]["name"] == "send_message_to_agent" else t for t in TOOL_SCHEMAS]
+        return [*swapped, FIND_TASKS_SCHEMA]
     return TOOL_SCHEMAS
 
 

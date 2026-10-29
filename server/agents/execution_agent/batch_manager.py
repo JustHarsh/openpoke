@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from .runtime import ExecutionAgentRuntime, ExecutionResult
+from ...services.tasks.store import get_task_store
 from ...logging_config import logger
 
 
@@ -49,6 +50,7 @@ class ExecutionBatchManager:
         agent_name: str,
         instructions: str,
         request_id: Optional[str] = None,
+        task_id: Optional[int] = None,
     ) -> ExecutionResult:
         """Execute an agent asynchronously and buffer the result for batch dispatch."""
 
@@ -59,7 +61,7 @@ class ExecutionBatchManager:
 
         try:
             logger.info(f"[{agent_name}] Execution started")
-            runtime = ExecutionAgentRuntime(agent_name=agent_name)
+            runtime = ExecutionAgentRuntime(agent_name=agent_name, task_id=task_id)
             result = await asyncio.wait_for(
                 runtime.execute(instructions),
                 timeout=self.timeout_seconds,
@@ -84,6 +86,13 @@ class ExecutionBatchManager:
             )
         finally:
             self._pending.pop(request_id, None)
+
+        if task_id is not None:  # keep the latest outcome on the record for follow-ups
+            store = get_task_store()
+            task = store.get(task_id)
+            store.update_fields(
+                task_id, data={**task.data, "last_result": (result.response or "")[:2000], "last_run_ok": result.success}
+            )
 
         await self._complete_execution(batch_id, result, agent_name)
         return result

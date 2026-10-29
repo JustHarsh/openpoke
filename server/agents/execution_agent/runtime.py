@@ -7,8 +7,9 @@ from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 
 from .agent import ExecutionAgent
-from .tools import get_tool_schemas, get_tool_registry
+from .tools import get_tool_schemas, get_tool_registry, task_state
 from ...config import get_settings
+from ...services.tasks.store import get_task_store
 from ...openrouter_client import request_chat_completion
 from ...openrouter_client.usage import current_agent, record_tool_call
 from ...logging_config import logger
@@ -30,13 +31,17 @@ class ExecutionAgentRuntime:
     MAX_TOOL_ITERATIONS = 8
 
     # Initialize execution agent runtime with settings, tools, and agent instance
-    def __init__(self, agent_name: str):
+    def __init__(self, agent_name: str, task_id: Optional[int] = None):
         settings = get_settings()
         self.agent = ExecutionAgent(agent_name)
         self.api_key = settings.openrouter_api_key
         self.model = settings.execution_agent_model
         self.tool_registry = get_tool_registry(agent_name=agent_name)
         self.tool_schemas = get_tool_schemas()
+        self.task_id = task_id
+        if task_id is not None:  # redesign: state lives in the task record, send tools are gated
+            self.tool_registry = task_state.build_registry(get_task_store(), task_id, self.tool_registry)
+            self.tool_schemas = [*self.tool_schemas, *task_state.get_schemas()]
 
         if not self.api_key:
             raise ValueError("OpenRouter API key not configured. Set OPENROUTER_API_KEY environment variable.")
@@ -47,7 +52,11 @@ class ExecutionAgentRuntime:
         current_agent.set(self.agent.name)
         try:
             # Build system prompt with history
-            system_prompt = self.agent.build_system_prompt_with_history()
+            if self.task_id is not None:
+                task = get_task_store().get(self.task_id)
+                system_prompt = f"{self.agent.build_system_prompt()}\n\n{task_state.render_task_context(task)}"
+            else:
+                system_prompt = self.agent.build_system_prompt_with_history()
 
             # Start conversation with the instruction
             messages = [{"role": "user", "content": instructions}]

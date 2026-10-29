@@ -168,12 +168,12 @@ class InteractionAgentRuntime:
             for tool_call in parsed_tool_calls:
                 summary.tool_names.append(tool_call.name)
 
-                if tool_call.name == "send_message_to_agent":
-                    agent_name = tool_call.arguments.get("agent_name")
+                result = self._execute_tool(tool_call)
+
+                if tool_call.name == "send_message_to_agent" and isinstance(result.payload, dict):
+                    agent_name = result.payload.get("agent_name")
                     if isinstance(agent_name, str) and agent_name:
                         summary.execution_agents.add(agent_name)
-
-                result = self._execute_tool(tool_call)
 
                 if result.user_message:
                     summary.user_messages.append(result.user_message)
@@ -304,7 +304,7 @@ class InteractionAgentRuntime:
                 tool=tool_call.name,
                 success=result.success,
                 duration_ms=int((time.perf_counter() - started) * 1000),
-                detail=tool_call.arguments.get("agent_name") if tool_call.name == "send_message_to_agent" else None,
+                detail=result.payload.get("agent_name") if tool_call.name == "send_message_to_agent" and isinstance(result.payload, dict) else None,
             )
         except Exception as exc:  # pragma: no cover - defensive
             logger.error(
