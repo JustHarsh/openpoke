@@ -36,7 +36,7 @@ Whether 2 beats 1 is what the evaluators decide. Where 2 is neutral or worse (sm
 
 **Task store.** One SQLite table in the data dir: `id, kind, status, entities, thread_id, data, summary, updated_at`.
 - `kind` is a closed set: `email_thread`, `email_lookup`, `other`. A closed set stops the model inventing near-duplicate labels.
-- `email_thread` statuses: `drafting`, `pending_approval`, `sent`, `awaiting_reply`, `replied`, `closed`. Sending is reachable only through the approval transition, enforced in code.
+- `email_thread` statuses: `drafting`, `pending_approval`, `sent` (sent, waiting for a reply), `replied`, `closed`. Sending is reachable only from `pending_approval`, enforced in code. A closed thread can be reopened by a late reply (`closed -> replied`), and a follow-up goes `replied -> drafting`. A failed send leaves the task in `pending_approval` and the error goes in `data`; there is no `failed` status.
 
 **Retrieval.** `find_tasks(query, kind?, limit)` returns the top-k records, scored on entities and summary. Replaces the roster in the prompt.
 

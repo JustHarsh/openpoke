@@ -1,17 +1,24 @@
-"""Task lifecycle rules. Status changes only happen through `advance`, so approval cannot be skipped.
-
-TODO(Harsh): fill ALLOWED and implement `advance`; tests go in tests/test_transitions.py.
-"""
+"""Task lifecycle rules. Status changes only happen through `advance`, so approval cannot be skipped."""
 
 KINDS = ("email_thread", "email_lookup", "other")
 
 # Status a new task of each kind starts in.
 INITIAL = {"email_thread": "drafting", "email_lookup": "done", "other": "open"}
 
-# kind -> {from_status: {allowed next statuses}}. email_thread per the design doc:
-# drafting, pending_approval, sent, awaiting_reply, replied, closed. Sending must be
-# reachable only from pending_approval.
-ALLOWED: dict = {}
+# kind -> {from_status: {allowed next statuses}}. The keys of the inner dict are the valid statuses.
+# email_thread: only pending_approval leads to sent, so a send cannot skip approval.
+# A failed send leaves the task in pending_approval; the error is stored in task.data.
+ALLOWED: dict = {
+    "email_thread": {
+        "drafting": {"pending_approval"},
+        "pending_approval": {"sent", "drafting", "closed"},
+        "sent": {"replied", "closed"},
+        "replied": {"drafting", "closed"},
+        "closed": {"replied"},
+    },
+    "email_lookup": {"done": set()},
+    "other": {"open": {"closed"}, "closed": {"open"}},
+}
 
 
 class InvalidTransition(ValueError):
@@ -23,4 +30,9 @@ def advance(store, task_id: int, new_status: str):
 
     Use store.set_status(task_id, new_status) to write once the check passes.
     """
-    raise NotImplementedError
+    task = store.get(task_id)
+    if task is None:
+        raise KeyError(task_id)
+    if new_status not in ALLOWED[task.kind].get(task.status, set()):
+        raise InvalidTransition(f"{task.kind}: {task.status} -> {new_status}")
+    return store.set_status(task_id, new_status)
