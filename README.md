@@ -1,94 +1,25 @@
-# OpenPoke 🌴
+[OpenPoke (original repository)](https://github.com/shlokkhemani/openpoke)
 
-OpenPoke is a simplified, open-source take on [Interaction Company’s](https://interaction.co/about) [Poke](https://poke.com/) assistant—built to show how a multi-agent orchestration stack can feel genuinely useful. It keeps the handful of things Poke is great at (email triage, reminders, and persistent agents) while staying easy to spin up locally.
+# OpenPoke: fixing agent overload
 
-- Multi-agent FastAPI backend that mirrors Poke's interaction/execution split, powered by [OpenRouter](https://openrouter.ai/).
-- Gmail tooling via [Composio](https://composio.dev/) for drafting/replying/forwarding without leaving chat.
-- Trigger scheduler and background watchers for reminders and "important email" alerts.
-- Next.js web UI that proxies everything through the shared `.env`, so plugging in API keys is the only setup.
+This fork changes how OpenPoke remembers work. In the original, every task becomes a permanent agent, and every agent is listed in the assistant's prompt on every call. As history grows, calls get bigger, slower and more confused about which agent to use. That is agent overload.
 
-## Requirements
-- Python 3.10+
-- Node.js 18+
-- npm 9+
+## The approach: persist task state, not agents
 
-## Quickstart
-1. **Clone and enter the repo.**
-   ```bash
-   git clone https://github.com/shlokkhemani/OpenPoke
-   cd OpenPoke
-   ```
-2. **Create a shared env file.** Copy the template and open it in your editor:
-   ```bash
-   cp .env.example .env
-   ```
-3. **Get your API keys and add them to `.env`:**
-   
-   **OpenRouter (Required)**
-   - Create an account at [openrouter.ai](https://openrouter.ai/)
-   - Generate an API key
-   - Replace `your_openrouter_api_key_here` with your actual key in `.env`
-   
-   **Composio (Required for Gmail)**
-   - Sign in at [composio.dev](https://composio.dev/)
-   - Create an API key
-   - Set up Gmail integration and get your auth config ID
-   - Replace `your_composio_api_key_here` and `your_gmail_auth_config_id_here` in `.env`
-4. **(Required) Create and activate a Python 3.10+ virtualenv:**
-   ```bash
-   # Ensure you're using Python 3.10+
-   python3.10 -m venv .venv
-   source .venv/bin/activate
-   
-   # Verify Python version (should show 3.10+)
-   python --version
-   ```
-   On Windows (PowerShell):
-   ```powershell
-   # Use Python 3.10+ (adjust path as needed)
-   python3.10 -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   
-   # Verify Python version
-   python --version
-   ```
+- **Tasks live in a database.** Each unit of work (an email thread, a lookup) is a row with a status, the people involved and a short summary. Agents no longer pile up.
+- **A cheap model finds the right task.** One small-model call reads the stored tasks and returns the few that match the message. It flags ambiguity, so the assistant can ask "which one?" instead of guessing.
+- **Workers are short-lived.** Work runs in a worker that starts from the task record and then exits. No roster in the prompt, and no per-agent logs to reload.
+- **Rules live in code, not prompts.** A status machine decides what can happen next, and a send is refused until the user has approved the draft.
+- **Email is deterministic where it can be.** Time ranges like "the last 2 hours" are resolved in code, broad questions get a default window, and a cheap model filters emails by meaning.
 
-5. **Install backend dependencies:**
-   ```bash
-   pip install -r server/requirements.txt
-   ```
-6. **Install frontend dependencies:**
-   ```bash
-   npm install --prefix web
-   ```
-7. **Start the FastAPI server:**
-   ```bash
-   python -m server.server --reload
-   ```
-8. **Start the Next.js app (new terminal):**
-   ```bash
-   npm run dev --prefix web
-   ```
-9. **Connect Gmail for email workflows.** With both services running, open [http://localhost:3000](http://localhost:3000), head to *Settings → Gmail*, and complete the Composio OAuth flow. This step is required for email drafting, replies, and the important-email monitor.
+`OPENPOKE_VARIANT` switches between `baseline` (the original), `topk` and `redesign` (this approach), so the versions can be compared on the same inputs.
 
-The web app proxies API calls to the Python server using the values in `.env`, so keeping both processes running is required for end-to-end flows.
+## How it was checked
 
-## Project Layout
-- `server/` – FastAPI application and agents
-- `web/` – Next.js app
-- `server/data/` – runtime data (ignored by git)
+Unit tests, plus labelled evaluators that run both versions against a mock inbox. See [docs/writeup.md](docs/writeup.md) and [docs/specs/agent-overload-design.md](docs/specs/agent-overload-design.md) for the design and results.
 
-## Tests and experiments
-Agent-overload work lives in `docs/` (design: `docs/specs/agent-overload-design.md`, results: `docs/writeup.md`). `OPENPOKE_VARIANT` selects `baseline` (original), `topk` or `redesign` (stored tasks instead of long-lived agents).
 ```bash
-pip install -r server/requirements-dev.txt
-python -m pytest                      # unit tests: no network, no LLM, temp data dir, mock Gmail
-# evaluators: isolated runs against a mock inbox, hard spending cap
-python -m server.experiments.run --label demo --scenarios overload_probe --sweep-n 10,50 \
-    --variants baseline,redesign --max-cost 5
-python -m server.experiments.report server/experiments/runs/<run_dir>   # writes summary.md and CSVs
+pip install -r server/requirements-dev.txt && python -m pytest
 ```
-See `server/experiments/EXPERIMENTS.md` for the scenarios and metrics. Evaluator runs call the real models through OpenRouter and cost money; the mock Gmail never touches a real mailbox.
 
-## License
-MIT — see [LICENSE](LICENSE).
+Setup and API keys are unchanged from the original; see its README.
