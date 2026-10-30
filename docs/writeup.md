@@ -60,6 +60,11 @@ What it shows:
 - **Where the baseline fails:** `reply_priya` fanned out or hit the wrong agent at N=10 and 50; `lunch_followup` went wrong at N=200.
 - Both variants answered the two content-graded probes correctly.
 
+Repeat check (stage 2). I ran out of OpenRouter credits partway through (HTTP 402; the balance was $0.44, not what I had assumed), so 30 of the 36 planned repeat runs failed and are discarded. Six clean repeats at N=200 survive (3 probes x 2 variants):
+- Cost and call counts reproduce: reply_alice $0.21 then $0.21 (baseline) and $0.02 then $0.02 (redesign); reply_priya $0.18 then $0.17 and $0.02 then $0.05; lunch_followup $0.18 then $0.16 and $0.14 then $0.15.
+- Outcomes mostly reproduce, except `lunch_followup`, which flipped from "wrong" to "routed" in both variants. That probe's label is unstable, so it is weak evidence either way.
+- Everything else is still one run per cell. The runner now stops when it sees a 402 so this cannot silently record junk runs again.
+
 Scoring notes: "answered" means the reply was correct and no worker was started; asking counts as correct only on probes with look-alike names by construction.
 
 Already measured (single runs, mock inbox):
