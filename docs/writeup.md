@@ -27,9 +27,3 @@ Persist task state, not agents.
 - Beyond overload, the original had four broad problems: cost, latency, visibility and safety. The redesign addresses each.
 - Smaller fixes: a retired default model that made every call fail, failures logged without a cause, an oversized fetch in the email watcher, a deprecated Gmail connect call, and sub-day time ranges that depended on the model improvising.
 - Still open: the assistant makes repeated "wait" calls (about 1.6 per turn, down from 3.6), prompt caching is unused, and the approval gate has not yet been tested against an attack.
-
-## How far to trust it
-Most results are a single run per case, on a mock inbox with look-alike names built in. Six repeat runs reproduced cost within about 25%. Real inboxes are bigger and messier, so absolute email costs will differ; the trend as history grows is the part to trust. We ran out of API credits before running more repeats.
-
-## Next
-Cut the repeated waits, add a shortlist in front of the task lookup so it stays flat at any size, test on a real inbox, then reminders.
