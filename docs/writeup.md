@@ -1,6 +1,14 @@
 # Agent overload in OpenPoke: writeup
 
-Status: draft. Sections marked TODO wait for the N-sweep results or are yours to write. Design details are in `specs/agent-overload-design.md`.
+Design details are in `specs/agent-overload-design.md`; how to run everything is in the README.
+
+## Summary
+The original system lists every past execution agent in the interaction agent's prompt on every request. I replaced long-lived agents with stored tasks and short-lived workers, and compared the two versions on 9 labelled probes at three history sizes (N = 10, 50, 200).
+- **Cost and prompt size grow with history in the original and stay flat in the redesign.** From N=10 to N=200 the original's cost per turn rose 27% ($0.172 to $0.218) and its prompt tokens 65%; the redesign stayed at $0.07-0.10 per turn. The redesign cost about 40-58% of the original at each N.
+- **Routing accuracy is a tie** (8 or 9 of 9 per cell, one run each). I cannot claim the redesign routes better.
+- **Where it clearly wins:** follow-ups answerable from stored state. "What deadline did Dana give me?" costs the original $0.22-0.38 (rising with N) and the redesign $0.02-0.04 (flat).
+- **Where it is weaker:** it asks "which one?" more often when names are ambiguous, and it sometimes starts a fresh worker when the stored record already had the answer.
+- **How far to trust it:** one run per cell, a mock inbox, and look-alike names built in. Six repeat runs reproduced cost within about 25%.
 
 ## 1. The problem, measured
 Every execution agent ever created is listed in the interaction agent's prompt on every request.
@@ -30,7 +38,7 @@ Persist task state, not agents. Selected with `OPENPOKE_VARIANT=baseline | topk 
 - **What does not stay flat:** the matcher's own input grows with N (about 50 tokens per task, roughly 10k at N=200). It sits outside the main context, but it is real cost; a shortlist in front would make it flat (not built). Worker-written `summary` and `data` are not capped in code.
 
 ## 3. How I tested it
-- **Unit tests** (`python -m pytest`; 151 tests, no LLM, no network): state machine over every status pair, the approval gate and failed-send behavior, the task store, time-range parsing to the second, the Haiku matcher and filter with a fake model, prompt assembly per variant, seeding.
+- **Unit tests** (`python -m pytest`; 152 tests, no LLM, no network): state machine over every status pair, the approval gate and failed-send behavior, the task store, time-range parsing to the second, the Haiku matcher and filter with a fake model, prompt assembly per variant, seeding.
 - **Evaluators** (`python -m server.experiments.run ...`; mock Gmail, isolated data dir per run, hard `--max-cost` cap):
   - *Overload probes*: 9 single-message probes against a roster of N seeded agents (and matching tasks). Each has a labelled expected target. Outcomes: routed, asked, fan-out, wrong, no-action. Asking counts as correct only on probes where several same-named people exist by construction. Two probes (Dana) are unambiguous, to isolate pure memory.
   - *N-sweep*: the same probes at N = 10, 50, 200 per variant: routing accuracy, prompt tokens, cost, LLM calls, latency.
@@ -40,7 +48,7 @@ Persist task state, not agents. Selected with `OPENPOKE_VARIANT=baseline | topk 
 - **A scoring bug of mine:** the job-filter check required the word "interview", failing a correct baseline answer. Checks now look for sender names.
 
 ## 4. Results
-Stage 1: 9 overload probes x N = 10, 50, 200 x {baseline, redesign}, one run per cell (54 runs, $7.54: baseline $5.19, redesign $2.35). Per-turn averages; "inter prompt tok" is the interaction agent's prompt tokens summed over the 6-16 calls in a turn.
+Stage 1: 9 overload probes x N = 10, 50, 200 x {baseline, redesign}, one run per cell (54 runs, $7.54: baseline $5.19, redesign $2.35). Per-turn averages; "inter prompt tok" is the interaction agent's prompt tokens summed over all of its calls in a turn.
 
 | variant | N | routing acc | $/turn | inter prompt tok | LLM calls | p50 latency |
 |---|---|---|---|---|---|---|
@@ -67,7 +75,7 @@ Repeat check (stage 2). I ran out of OpenRouter credits partway through (HTTP 40
 
 Scoring notes: "answered" means the reply was correct and no worker was started; asking counts as correct only on probes with look-alike names by construction.
 
-Already measured (single runs, mock inbox):
+Email queries and the injection scenario (single runs, mock inbox with real bodies; run on the code as of commit `5edca76`, before the last few commits, which did not touch email or injection behavior):
 | query | baseline | redesign |
 |---|---|---|
 | job-related emails, last 3 days | correct, 20 calls, $0.249 | correct, 12 calls, $0.142 |
@@ -87,10 +95,18 @@ A small test (7 probes, N=50, one run each): routed correctly 3 of 7 vs baseline
 - Fixed: failures logged with no cause (log format dropped `extra=`); the default model had been retired on OpenRouter (every call 404); the importance watcher's 50-email fetch hit a 413; the search prompt knew only the date, so "last 4 hours" could not be expressed.
 
 ## 7. Limits
-Single runs, so numbers are noisy (baseline fan-out varies run to run). Mock Gmail: fast and small, so tool latency and email-heavy token cost are understated. The probe roster has look-alike names by construction (adversarial, though plausible at N=200). Matching quality is judged only by the probes, since the matcher is a model. Strict labels count a sensible but differently routed answer as a miss.
+Single runs for most cells, so numbers are noisy (baseline fan-out varies run to run). I ran out of credits before a planned final re-run of the email and injection checks on the last commit, and before more repeats. Mock Gmail: fast and small, so tool latency and email-heavy token cost are understated. The probe roster has look-alike names by construction (adversarial, though plausible at N=200). Matching quality is judged only by the probes, since the matcher is a model. Strict labels count a sensible but differently routed answer as a miss.
 
 ## 8. Not done / next
 Reminders and recurring tasks (path in the design doc); a lexical shortlist in front of the matcher so it is flat in N; embeddings for paraphrase matching; the `wait` fix; repeats for confidence intervals.
 
-## 9. TODO(Harsh): your analysis
-What the sweep says, where `redesign` is neutral or worse (small N), what you would do next.
+## 9. Analysis
+**What the evidence supports.** The claim that agent overload costs money and prompt space is true but modest at these sizes: the roster itself is about 13 tokens per agent. What grows more is everything that rides on it. In the original, every interaction call carries the roster, a reused agent reloads its whole log, and look-alike names push the model into fan-out. In the sweep the original's cost rose 27% and its prompt tokens 65% as history went from 10 to 200 items, while the redesign stayed flat. That is the result I trust most, because it held at all three sizes and the repeat runs reproduced the cost numbers.
+
+**What it does not support.** I did not show better routing: both versions scored 0.89 in most cells, which at 9 probes and one run each is indistinguishable. I did not show a latency difference either. The probe set is small and was written by me, the history is synthetic with look-alike names by construction, and the inbox is a mock. A real mailbox is larger and messier, so absolute costs will differ; the direction of the N-trend is the part I would expect to transfer.
+
+**Where the redesign is neutral or worse.** At small N there is little to gain, and the extra lookup step can cost a call. It asks for clarification more often, which is correct when two Alices exist but adds a turn for the user. It sometimes starts a worker when the record already held the answer (`lunch_followup`), and that probe's outcome flipped between runs, so the behavior is not stable. The matcher reads every task, so its own cost grows linearly with N; at 200 tasks that is about 10k tokens on a cheap model, which is affordable, but past a few hundred a shortlist in front of it is needed.
+
+**What I would do next, in order.** (1) Fix the interaction agent's repeated `wait` and message calls, which cost about 9 calls per email question in both versions and are now the largest remaining cost. (2) Add a shortlist in front of the matcher so it is flat in N. (3) Re-run each cell several times to get intervals instead of single points. (4) Run against a real mailbox, since tool latency and email size are understated here. (5) Reminders, using the path in the design doc.
+
+**Two things that went wrong and how they were caught.** The first mock inbox never delivered email bodies, so early email and injection results were void; the agents' own replies ("couldn't pull the body") gave it away and I discarded those numbers. And a sweep ran past the end of the account's credits; the failed runs exited cleanly, so I only noticed because total spend was far below the estimate. The runner now stops on an out-of-credits error.
