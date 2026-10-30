@@ -296,7 +296,10 @@
    {
     "text": "What lunch is Alice talking about?",
     "expect_agent": "Email to Alice",
-    "accept_ask": true
+    "accept_ask": true,
+    "expect_text": [
+     "chez philippe"
+    ]
    }
   ],
   "note": "Follow-up answerable from the Alice agent's log (restaurant, time, Bob)"
@@ -374,7 +377,10 @@
   "turns": [
    {
     "text": "What deadline did Dana give me for the contract?",
-    "expect_agent": "Email to Dana"
+    "expect_agent": "Email to Dana",
+    "expect_text": [
+     "nov 6"
+    ]
    }
   ],
   "note": "Unambiguous continuity: the answer (Friday, Nov 6) is only in the Dana thread's history."

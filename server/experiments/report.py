@@ -117,11 +117,17 @@ def collect(run_dir: Path):
                 expected = {f"task-{seeded_order.index(name) + 1}" for name in expected}
             asked = "?" in " ".join([t.get("final_response") or ""] + [r["text"] for r in t["replies"]])
             outcome = None if expected is None else _outcome(set(spawned), expected, asked)
-            routed = None if expected is None else int(outcome in ("routed", "no_agent") or (outcome == "asked" and bool(t.get("accept_ask"))))
+            content_ok = _content_ok(t)
+            if outcome == "no_action" and content_ok == 1:
+                outcome = "answered"  # replied correctly from stored state without starting any work
+            routed = None if expected is None else int(outcome in ("routed", "no_agent", "answered") or (outcome == "asked" and bool(t.get("accept_ask"))))
             turn_rows.append({
                 "variant": info.get("variant", "baseline"), "n": info.get("n"),
-                "expect_agent": expect, "routed_correct": routed, "outcome": outcome, "content_ok": _content_ok(t),
-                "duplicate_agent": int(any(a not in seeded for a in spawned)) if seeded else None,
+                "expect_agent": expect, "routed_correct": routed, "outcome": outcome, "content_ok": content_ok,
+                "duplicate_agent": (
+                    int(any(a.startswith("task-") and int(a[5:]) > len(seeded_order) for a in spawned)) if info.get("variant") == "redesign"
+                    else int(any(a not in seeded for a in spawned))
+                ) if seeded else None,
                 "category": t.get("category", "legacy"), "scenario": t["scenario"], "run": sub.name, "turn": t["turn"], "request_id": rid,
                 "message": t["message"],
                 "failed": int(not t["success"] or t["drained"] is False or any(c["status"] != "ok" for c in cs)),
@@ -261,11 +267,13 @@ def main() -> None:
         for (v, n), rs in sorted(sweep.items()):
             labelled = [r["routed_correct"] for r in rs if r["routed_correct"] is not None]
             dups = [r["duplicate_agent"] for r in rs if r["duplicate_agent"] is not None]
+            graded = [r["content_ok"] for r in rs if r["content_ok"] is not None]
             rows.append([v, n, len(rs), (sum(labelled) / len(labelled)) if labelled else None,
+                         (sum(graded) / len(graded)) if graded else None,
                          (sum(dups) / len(dups)) if dups else None,
                          _agg([r["interaction_prompt_tokens"] for r in rs], "mean"), _agg([r["cost_usd"] for r in rs], "mean"),
                          _agg([r["total_s"] for r in rs], "p50"), _agg([r["llm_calls"] for r in rs], "mean")])
-        md += ["## N-sweep", "", _table(["variant", "N", "turns", "routing acc", "duplicate agent rate", "inter prompt tok", "$/turn", "total p50 s", "llm calls"], rows), ""]
+        md += ["## N-sweep", "", _table(["variant", "N", "turns", "routing acc", "answer ok", "new agent/task rate", "inter prompt tok", "$/turn", "total p50 s", "llm calls"], rows), ""]
 
     # Content checks: did the reply contain what it should and nothing it should not
     checked = [r for r in turn_rows if r["content_ok"] is not None]
