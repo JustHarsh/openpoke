@@ -78,5 +78,17 @@ The web app proxies API calls to the Python server using the values in `.env`, s
 - `web/` – Next.js app
 - `server/data/` – runtime data (ignored by git)
 
+## Tests and experiments
+Agent-overload work lives in `docs/` (design: `docs/specs/agent-overload-design.md`, results: `docs/writeup.md`). `OPENPOKE_VARIANT` selects `baseline` (original), `topk` or `redesign` (stored tasks instead of long-lived agents).
+```bash
+pip install -r server/requirements-dev.txt
+python -m pytest                      # unit tests: no network, no LLM, temp data dir, mock Gmail
+# evaluators: isolated runs against a mock inbox, hard spending cap
+python -m server.experiments.run --label demo --scenarios overload_probe --sweep-n 10,50 \
+    --variants baseline,redesign --max-cost 5
+python -m server.experiments.report server/experiments/runs/<run_dir>   # writes summary.md and CSVs
+```
+See `server/experiments/EXPERIMENTS.md` for the scenarios and metrics. Evaluator runs call the real models through OpenRouter and cost money; the mock Gmail never touches a real mailbox.
+
 ## License
 MIT — see [LICENSE](LICENSE).
