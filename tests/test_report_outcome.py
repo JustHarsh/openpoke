@@ -28,3 +28,19 @@ def test_content_check_requires_expected_and_no_forbidden():
     assert _content_ok(_turn("interview and a newsletter", ["interview"], ["newsletter"])) == 0
     assert _content_ok(_turn("nothing relevant", ["interview"], [])) == 0
     assert _content_ok(_turn("anything")) is None
+
+
+def test_runner_detects_out_of_credits(tmp_path):
+    import json
+
+    from server.experiments.run import _run_errors
+
+    log = tmp_path / "data" / "usage"
+    log.mkdir(parents=True)
+    ok = {"status": "ok", "error": None}
+    no_credits = {"status": "error", "error": "OpenRouter request failed (402): requires more credits"}
+    other = {"status": "error", "error": "OpenRouter request failed (500): boom"}
+    (log / "llm_calls.jsonl").write_text("\n".join(json.dumps(x) for x in (ok, no_credits, other)) + "\n")
+    assert _run_errors(tmp_path) == (2, True)
+    (log / "llm_calls.jsonl").write_text(json.dumps(ok) + "\n")
+    assert _run_errors(tmp_path) == (0, False)

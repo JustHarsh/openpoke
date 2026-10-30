@@ -43,7 +43,19 @@ def _run_one(run_dir: Path, scenario_id: str, rep: int, n, variant: str, extra_e
     (out / "stderr.log").write_text(proc.stderr)
     cost = _run_cost(out)
     print(f"  {scenario_id} {variant} n={n} r{rep}: exit={proc.returncode} {time.monotonic() - started:.0f}s ${cost:.3f}", flush=True)
-    return {"scenario": scenario_id, "rep": rep, "exit": proc.returncode, "cost": cost}
+    failed, no_credits = _run_errors(out)
+    if failed:
+        print(f"    WARNING: {failed} failed LLM calls in this run" + (" (out of credits, 402)" if no_credits else ""), flush=True)
+    return {"scenario": scenario_id, "rep": rep, "exit": proc.returncode, "cost": cost, "no_credits": no_credits}
+
+
+# Number of failed LLM calls in one run, and whether any was an out-of-credits (402) error
+def _run_errors(out: Path) -> tuple:
+    log = out / "data" / "usage" / "llm_calls.jsonl"
+    if not log.exists():
+        return 0, False
+    errors = [json.loads(l) for l in log.read_text().splitlines() if l.strip() and '"status": "error"' in l]
+    return len(errors), any("402" in (e.get("error") or "") for e in errors)
 
 
 # Dollars spent by one scenario run, from its own usage log
@@ -101,11 +113,12 @@ def main() -> None:
 
     def job(j):
         with lock:
-            if a.max_cost is not None and spent["total"] >= a.max_cost:
-                return None  # cap reached: skip the remaining runs
+            if spent.get("no_credits") or (a.max_cost is not None and spent["total"] >= a.max_cost):
+                return None  # cap reached or account out of credits: skip the remaining runs
         result = _run_one(run_dir, j[0], j[1], j[2], j[3], envs[j[0]])
         with lock:
             spent["total"] += result["cost"]
+            spent["no_credits"] = spent.get("no_credits") or result["no_credits"]
         return result
 
     with ThreadPoolExecutor(max_workers=a.parallel) as pool:
