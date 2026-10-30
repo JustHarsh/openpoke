@@ -51,7 +51,7 @@ Whether 2 beats 1 is what the evaluators decide. Where 2 is neutral or worse (sm
 - **Default window:** when a query names no time window ("summarize my emails"), code applies the last 4 hours. The reply states the window and any truncation.
 - **"What did Priya say?":** if more than one person matches, ask which one. One match: answer and name them.
 - **Filtering by meaning ("job-related emails today?", "anything about my trip?"):** Gmail operators cannot express it. The subagent fetches the window's emails, then one cheap LLM call (Haiku, `EMAIL_FILTER_MODEL`) returns the ids matching any criterion, batched. "Today" is since local midnight in the user's timezone. Job-related is the example probe, not the only supported criterion.
-- **"Last 4 hours":** the search prompt only knows the date. Relative windows are resolved in code (`newer_than:Nh`) and passed to the search.
+- **"Last 4 hours":** the search prompt taught only day-level filters, so sub-day ranges relied on the model improvising. Relative ranges are now resolved in code into exact timestamps and passed to the search.
 
 ## Testing
 - **Tests (pytest, no LLM):** state machine rejects invalid transitions and approval cannot be skipped; `find_tasks` is tested with a fake model (parsing, ambiguity flag, failures surface as errors); prompt size does not grow with stored tasks. Whether the real model picks the right task is measured by the probes, not unit tests.
