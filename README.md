@@ -16,7 +16,7 @@ This fork changes how OpenPoke remembers work. In the original, every task becom
 
 ## How it was checked
 
-Unit tests, plus labelled evaluators that run both versions against a mock inbox. See [docs/writeup.md](docs/writeup.md) and [docs/specs/agent-overload-design.md](docs/specs/agent-overload-design.md) for the design and results.
+Unit tests, plus labelled evaluators that run both versions against a mock inbox. See [docs/writeup.md](docs/writeup.md) and [docs/specs/agent-overload-design.md](docs/specs/agent-overload-design.md) for the design and results, and [docs/commit-map.md](docs/commit-map.md) for the files touched in each commit and why.
 
 ```bash
 pip install -r server/requirements-dev.txt && python -m pytest
