@@ -12,7 +12,7 @@ Persist task state, not agents.
 - Email time ranges ("the last 2 hours") are resolved in code, and a cheap model filters emails by meaning.
 
 ## How we checked it
-152 unit tests, and 9 labelled test messages run against both versions at three history sizes (10, 50 and 200 items) on a mock inbox. We also ran email-question checks and a prompt-injection scenario. Every run logs cost, tokens, model calls and time.
+188 unit tests, and 9 labelled test messages run against both versions at three history sizes (10, 50 and 200 items) on a mock inbox. We also ran email-question checks and a prompt-injection scenario. Every run logs cost, tokens, model calls and time.
 
 ## Highlights
 - The original's cost per turn rose 27% as history grew from 10 to 200 items. The redesign stayed flat, at about half the cost ($0.09 vs $0.19 per turn on average).
