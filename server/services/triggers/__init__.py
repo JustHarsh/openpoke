@@ -14,6 +14,7 @@ _trigger_service = TriggerService(_trigger_store)
 
 
 def get_trigger_service() -> TriggerService:
+    """Return the process-wide trigger service."""
     return _trigger_service
 
 

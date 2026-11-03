@@ -20,6 +20,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 
 def _resolve_interaction_runtime() -> "InteractionAgentRuntime":
+    """Return a new interaction runtime (imported lazily)."""
     from ...agents.interaction_agent.runtime import InteractionAgentRuntime
 
     return InteractionAgentRuntime()
@@ -45,6 +46,7 @@ class ImportantEmailWatcher:
         *,
         seen_store: Optional[GmailSeenStore] = None,
     ) -> None:
+        """Set up the poll interval, lookback window and seen-message store."""
         self._poll_interval = poll_interval_seconds
         self._lookback_minutes = lookback_minutes
         self._lock = asyncio.Lock()
@@ -55,8 +57,8 @@ class ImportantEmailWatcher:
         self._has_seeded_initial_snapshot = False
         self._last_poll_timestamp: Optional[datetime] = None
 
-    # Start the background email polling task
     async def start(self) -> None:
+        """Start the background email polling task."""
         async with self._lock:
             if self._task and not self._task.done():
                 return
@@ -70,8 +72,8 @@ class ImportantEmailWatcher:
                 extra={"interval_seconds": self._poll_interval, "lookback_minutes": self._lookback_minutes},
             )
 
-    # Stop the background email polling task gracefully
     async def stop(self) -> None:
+        """Stop the background email polling task gracefully."""
         async with self._lock:
             self._running = False
             if self._task:
@@ -85,6 +87,7 @@ class ImportantEmailWatcher:
                 logger.info("Important email watcher stopped")
 
     async def _run(self) -> None:
+        """Poll in a loop until stopped."""
         try:
             while self._running:
                 try:
@@ -95,12 +98,13 @@ class ImportantEmailWatcher:
         except asyncio.CancelledError:
             raise
 
-    # Poll Gmail once for new messages and classify them for importance
     def _complete_poll(self, user_now: datetime) -> None:
+        """Poll Gmail once for new messages and classify them for importance."""
         self._last_poll_timestamp = user_now
         self._has_seeded_initial_snapshot = True
 
     async def _poll_once(self) -> None:
+        """Fetch new emails, classify them for importance and notify the user."""
         poll_started_at = datetime.now(timezone.utc)
         user_now = convert_to_user_timezone(poll_started_at)
         first_poll = not self._has_seeded_initial_snapshot
@@ -220,6 +224,7 @@ class ImportantEmailWatcher:
         self._complete_poll(user_now)
 
     async def _dispatch_summary(self, summary: str) -> None:
+        """Send an important-email summary to the interaction agent."""
         runtime = _resolve_interaction_runtime()
         try:
             contextualized = f"Important email watcher notification:\n{summary}"
@@ -235,6 +240,7 @@ _watcher_instance: Optional[ImportantEmailWatcher] = None
 
 
 def get_important_email_watcher() -> ImportantEmailWatcher:
+    """Return the process-wide email watcher."""
     global _watcher_instance
     if _watcher_instance is None:
         _watcher_instance = ImportantEmailWatcher()

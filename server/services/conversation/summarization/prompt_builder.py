@@ -59,11 +59,13 @@ _SYSTEM_PROMPT = dedent(
 
 
 def _format_existing_summary(previous_summary: str) -> str:
+    """Return the previous summary, or 'None'."""
     summary = (previous_summary or "").strip()
     return summary if summary else "None"
 
 
 def _format_log_entries(entries: List[LogEntry]) -> str:
+    """Render log entries one per line for the prompt."""
     lines: List[str] = []
     for entry in entries:
         label = entry.tag.replace("_", " ")
@@ -77,6 +79,7 @@ def _format_log_entries(entries: List[LogEntry]) -> str:
 
 
 def build_summarization_prompt(previous_summary: str, entries: List[LogEntry]) -> SummaryPrompt:
+    """Build the prompt that updates the memory summary from new entries."""
     content = dedent(
         f"""
         Existing memory summary:

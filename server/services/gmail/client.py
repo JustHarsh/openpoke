@@ -26,10 +26,12 @@ _ACTIVE_USER_ID: Optional[str] = None
 
 
 def _normalized(value: Optional[str]) -> str:
+    """Strip whitespace; None becomes an empty string."""
     return (value or "").strip()
 
 
 def _set_active_gmail_user_id(user_id: Optional[str]) -> None:
+    """Remember the connected Gmail user id."""
     sanitized = _normalized(user_id)
     with _ACTIVE_USER_ID_LOCK:
         global _ACTIVE_USER_ID
@@ -37,6 +39,7 @@ def _set_active_gmail_user_id(user_id: Optional[str]) -> None:
 
 
 def get_active_gmail_user_id() -> Optional[str]:
+    """Return the connected Gmail user id (a fixed id under the mock)."""
     if _mock.enabled():
         return _mock.MOCK_USER_ID
     with _ACTIVE_USER_ID_LOCK:
@@ -44,12 +47,13 @@ def get_active_gmail_user_id() -> Optional[str]:
 
 
 def _gmail_import_client():
+    """Import the Composio client lazily."""
     from composio import Composio  # type: ignore
     return Composio
 
 
-# Get or create a singleton Composio client instance with thread-safe initialization
 def _get_composio_client(settings: Optional[Settings] = None):
+    """Get or create a singleton Composio client instance with thread-safe initialization."""
     global _CLIENT
     if _CLIENT is not None:
         return _CLIENT
@@ -71,6 +75,7 @@ def _get_composio_client(settings: Optional[Settings] = None):
 
 
 def _extract_email(obj: Any) -> Optional[str]:
+    """Find an email address in a nested Composio response."""
     if obj is None:
         return None
     direct_keys = (
@@ -125,6 +130,7 @@ def _extract_email(obj: Any) -> Optional[str]:
 
 
 def _cache_profile(user_id: str, profile: Dict[str, Any]) -> None:
+    """Cache a Gmail profile by user id."""
     sanitized = _normalized(user_id)
     if not sanitized or not isinstance(profile, dict):
         return
@@ -136,6 +142,7 @@ def _cache_profile(user_id: str, profile: Dict[str, Any]) -> None:
 
 
 def _get_cached_profile(user_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Return the cached profile for a user id, or None."""
     sanitized = _normalized(user_id)
     if not sanitized:
         return None
@@ -147,6 +154,7 @@ def _get_cached_profile(user_id: Optional[str]) -> Optional[Dict[str, Any]]:
 
 
 def _clear_cached_profile(user_id: Optional[str] = None) -> None:
+    """Drop one cached profile, or all of them."""
     with _PROFILE_CACHE_LOCK:
         if user_id:
             _PROFILE_CACHE.pop(_normalized(user_id), None)
@@ -155,6 +163,7 @@ def _clear_cached_profile(user_id: Optional[str] = None) -> None:
 
 
 def _fetch_profile_from_composio(user_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Fetch the Gmail profile from Composio."""
     sanitized = _normalized(user_id)
     if not sanitized:
         return None
@@ -206,8 +215,8 @@ def _fetch_profile_from_composio(user_id: Optional[str]) -> Optional[Dict[str, A
     return None
 
 
-# Start Gmail OAuth connection process and return redirect URL
 def initiate_connect(payload: GmailConnectPayload, settings: Settings) -> JSONResponse:
+    """Start Gmail OAuth connection process and return redirect URL."""
     auth_config_id = payload.auth_config_id or settings.composio_gmail_auth_config_id or ""
     if not auth_config_id:
         return error_response(
@@ -237,8 +246,8 @@ def initiate_connect(payload: GmailConnectPayload, settings: Settings) -> JSONRe
         )
 
 
-# Check Gmail connection status and retrieve user account information
 def fetch_status(payload: GmailStatusPayload) -> JSONResponse:
+    """Check Gmail connection status and retrieve user account information."""
     connection_request_id = _normalized(payload.connection_request_id)
     user_id = _normalized(payload.user_id)
 
@@ -335,6 +344,7 @@ def fetch_status(payload: GmailStatusPayload) -> JSONResponse:
 
 
 def disconnect_account(payload: GmailDisconnectPayload) -> JSONResponse:
+    """Delete the Gmail connection and clear its cached state."""
     connection_id = _normalized(payload.connection_id) or _normalized(payload.connection_request_id)
     user_id = _normalized(payload.user_id)
 
@@ -359,6 +369,7 @@ def disconnect_account(payload: GmailDisconnectPayload) -> JSONResponse:
     affected_user_ids: set[str] = set()
 
     def _delete_connection(identifier: str) -> None:
+        """Delete a Composio connected account by id."""
         sanitized_id = _normalized(identifier)
         if not sanitized_id:
             return
@@ -439,6 +450,7 @@ def disconnect_account(payload: GmailDisconnectPayload) -> JSONResponse:
 
 
 def _normalize_tool_response(result: Any) -> Dict[str, Any]:
+    """Convert a Composio tool result into a plain dict."""
     payload_dict: Optional[Dict[str, Any]] = None
     try:
         if hasattr(result, "model_dump"):
@@ -466,13 +478,13 @@ def _normalize_tool_response(result: Any) -> Dict[str, Any]:
     return payload_dict
 
 
-# Execute Gmail operations through Composio SDK with error handling
 def execute_gmail_tool(
     tool_name: str,
     composio_user_id: str,
     *,
     arguments: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    """Execute Gmail operations through Composio SDK with error handling."""
     prepared_arguments: Dict[str, Any] = {}
     if isinstance(arguments, dict):
         for key, value in arguments.items():

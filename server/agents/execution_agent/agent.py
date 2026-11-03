@@ -32,7 +32,6 @@ Be thorough, accurate, and efficient in your execution."""
 class ExecutionAgent:
     """Manages state and history for an execution agent."""
 
-    # Initialize execution agent with name, conversation limits, and log store access
     def __init__(
         self,
         name: str,
@@ -49,7 +48,6 @@ class ExecutionAgent:
         self.conversation_limit = conversation_limit
         self._log_store = get_execution_agent_logs()
 
-    # Generate system prompt template with agent name and purpose derived from name
     def build_system_prompt(self) -> str:
         """Build the system prompt for this agent."""
         agent_purpose = f"Handle tasks related to: {self.name}"
@@ -59,7 +57,6 @@ class ExecutionAgent:
             agent_purpose=agent_purpose
         )
 
-    # Combine base system prompt with conversation history, applying conversation limits
     def build_system_prompt_with_history(self) -> str:
         """
         Build system prompt including agent history.
@@ -95,7 +92,6 @@ class ExecutionAgent:
 
         return base_prompt
 
-    # Format current instruction as user message for LLM consumption
     def build_messages_for_llm(self, current_instruction: str) -> List[Dict[str, str]]:
         """
         Build message array for LLM call.
@@ -110,12 +106,10 @@ class ExecutionAgent:
             {"role": "user", "content": current_instruction}
         ]
 
-    # Log the agent's final response to the execution log store
     def record_response(self, response: str) -> None:
         """Record agent's response to the log."""
         self._log_store.record_agent_response(self.name, response)
 
-    # Log tool invocation and results with truncated content for readability
     def record_tool_execution(self, tool_name: str, arguments: str, result: str) -> None:
         """Record tool execution details."""
         self._log_store.record_action(self.name, f"Calling {tool_name} with: {arguments[:200]}")

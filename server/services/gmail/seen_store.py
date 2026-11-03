@@ -15,6 +15,7 @@ class GmailSeenStore:
     """Maintain a bounded set of Gmail message IDs backed by a JSON file."""
 
     def __init__(self, path: Path, max_entries: int = 300) -> None:
+        """Load the seen message ids from disk, keeping at most max_entries."""
         self._path = path
         self._max_entries = max_entries
         self._lock = threading.Lock()
@@ -26,10 +27,12 @@ class GmailSeenStore:
     # Public API
     # ------------------------------------------------------------------
     def has_entries(self) -> bool:
+        """True if any message id has been recorded."""
         with self._lock:
             return bool(self._entries)
 
     def is_seen(self, message_id: str) -> bool:
+        """True if this message id was already recorded."""
         normalized = self._normalize(message_id)
         if not normalized:
             return False
@@ -37,6 +40,7 @@ class GmailSeenStore:
             return normalized in self._index
 
     def mark_seen(self, message_ids: Iterable[str]) -> None:
+        """Record message ids and persist them."""
         normalized_ids = [mid for mid in (self._normalize(mid) for mid in message_ids) if mid]
         if not normalized_ids:
             return
@@ -57,10 +61,12 @@ class GmailSeenStore:
             self._persist_locked()
 
     def snapshot(self) -> List[str]:
+        """Return the recorded ids, oldest first."""
         with self._lock:
             return list(self._entries)
 
     def clear(self) -> None:
+        """Forget all recorded ids."""
         with self._lock:
             self._entries.clear()
             self._index.clear()
@@ -70,11 +76,13 @@ class GmailSeenStore:
     # Internal helpers
     # ------------------------------------------------------------------
     def _normalize(self, message_id: Optional[str]) -> str:
+        """Strip a message id; empty if missing."""
         if not message_id:
             return ""
         return str(message_id).strip()
 
     def _load(self) -> None:
+        """Read the saved ids from disk."""
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
         except FileNotFoundError:
@@ -100,11 +108,13 @@ class GmailSeenStore:
                 self._index.add(normalized)
 
     def _prune_locked(self) -> None:
+        """Drop the oldest ids beyond max_entries (caller holds the lock)."""
         while len(self._entries) > self._max_entries:
             oldest = self._entries.popleft()
             self._index.discard(oldest)
 
     def _persist_locked(self) -> None:
+        """Write the ids to disk (caller holds the lock)."""
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             payload = list(self._entries)

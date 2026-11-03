@@ -11,15 +11,14 @@ from ...openrouter_client.usage import current_request_id, new_request_id, recor
 from ...utils import error_response
 
 
-# Extract the most recent user message from the chat request payload
 def _extract_latest_user_message(payload: ChatRequest) -> Optional[ChatMessage]:
+    """Extract the most recent user message from the chat request payload."""
     for message in reversed(payload.messages):
         if message.role.lower().strip() == "user" and message.content.strip():
             return message
     return None
 
 
-# Process incoming chat requests by routing them to the interaction agent runtime
 async def handle_chat_request(payload: ChatRequest) -> Union[PlainTextResponse, JSONResponse]:
     """Handle a chat request using the InteractionAgentRuntime."""
 
@@ -43,6 +42,7 @@ async def handle_chat_request(payload: ChatRequest) -> Union[PlainTextResponse, 
     record_request(request_id, user_content)
 
     async def _run_interaction() -> None:
+        """Run the interaction agent for this request in the background."""
         current_request_id.set(request_id)
         try:
             await runtime.execute(user_message=user_content)

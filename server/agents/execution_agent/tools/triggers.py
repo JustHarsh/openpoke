@@ -94,15 +94,14 @@ _LOG_STORE = get_execution_agent_logs()
 _TRIGGER_SERVICE = get_trigger_service()
 
 
-# Return trigger tool schemas
 def get_schemas() -> List[Dict[str, Any]]:
     """Return trigger tool schemas."""
 
     return _SCHEMAS
 
 
-# Convert TriggerRecord to dictionary payload for API responses
 def _trigger_record_to_payload(record: TriggerRecord) -> Dict[str, Any]:
+    """Convert TriggerRecord to dictionary payload for API responses."""
     return {
         "id": record.id,
         "payload": record.payload,
@@ -117,7 +116,6 @@ def _trigger_record_to_payload(record: TriggerRecord) -> Dict[str, Any]:
     }
 
 
-# Create a new trigger for the specified execution agent
 def _create_trigger_tool(
     *,
     agent_name: str,
@@ -126,6 +124,7 @@ def _create_trigger_tool(
     start_time: Optional[str] = None,
     status: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Create a new trigger for the specified execution agent."""
     timezone_value = get_timezone_store().get_timezone()
     summary_args = {
         "recurrence_rule": recurrence_rule,
@@ -163,7 +162,6 @@ def _create_trigger_tool(
     }
 
 
-# Update or pause an existing trigger owned by this execution agent
 def _update_trigger_tool(
     *,
     agent_name: str,
@@ -173,6 +171,7 @@ def _update_trigger_tool(
     start_time: Optional[str] = None,
     status: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Update or pause an existing trigger owned by this execution agent."""
     try:
         trigger_id_int = int(trigger_id)
     except (TypeError, ValueError):
@@ -214,8 +213,8 @@ def _update_trigger_tool(
     }
 
 
-# List all triggers belonging to this execution agent
 def _list_triggers_tool(*, agent_name: str) -> Dict[str, Any]:
+    """List all triggers belonging to this execution agent."""
     try:
         records = _TRIGGER_SERVICE.list_triggers(agent_name=agent_name)
     except Exception as exc:  # pragma: no cover - defensive
@@ -232,7 +231,6 @@ def _list_triggers_tool(*, agent_name: str) -> Dict[str, Any]:
     return {"triggers": [_trigger_record_to_payload(record) for record in records]}
 
 
-# Return trigger tool callables bound to a specific agent
 def build_registry(agent_name: str) -> Dict[str, Callable[..., Any]]:
     """Return trigger tool callables bound to a specific agent."""
 

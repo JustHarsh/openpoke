@@ -18,16 +18,19 @@ _WORKING_MEMORY_LOG_PATH = _DATA_DIR / "conversation" / "poke_working_memory.log
 
 
 def _encode_payload(payload: str) -> str:
+    """Escape a payload and fold newlines so it fits on one line."""
     normalized = payload.replace("\r\n", "\n").replace("\r", "\n")
     collapsed = normalized.replace("\n", "\\n")
     return escape(collapsed, quote=False)
 
 
 def _decode_payload(payload: str) -> str:
+    """Reverse _encode_payload."""
     return unescape(payload).replace("\\n", "\n")
 
 
 def _format_line(tag: str, payload: str, timestamp: Optional[str] = None) -> str:
+    """Format one entry as a tagged line, with a timestamp if given."""
     encoded = _encode_payload(payload)
     if timestamp:
         return f"<{tag} timestamp=\"{timestamp}\">{encoded}</{tag}>\n"
@@ -35,6 +38,7 @@ def _format_line(tag: str, payload: str, timestamp: Optional[str] = None) -> str
 
 
 def _current_timestamp() -> str:
+    """Current time in the user's timezone."""
     return now_in_user_timezone("%Y-%m-%d %H:%M:%S")
 
 
@@ -42,12 +46,14 @@ class WorkingMemoryLog:
     """Persisted working-memory file storing conversation summary and recent entries."""
 
     def __init__(self, path: Path) -> None:
+        """Set up the log file and its lock."""
         self._path = path
         self._lock = threading.Lock()
         self._ensure_directory()
         self._initialize_file()
 
     def _ensure_directory(self) -> None:
+        """Create the log directory if needed."""
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
         except Exception as exc:  # pragma: no cover - defensive
@@ -57,10 +63,12 @@ class WorkingMemoryLog:
             )
 
     def _initialize_file(self) -> None:
+        """Create the file with an empty summary state if needed."""
         with self._lock:
             self._initialize_file_locked()
 
     def _initialize_file_locked(self) -> None:
+        """Same as _initialize_file; the caller holds the lock."""
         if self._path.exists() and self._path.stat().st_size > 0:
             return
         initial_state = SummaryState.empty()
@@ -81,6 +89,7 @@ class WorkingMemoryLog:
             raise
 
     def append_entry(self, tag: str, payload: str, timestamp: Optional[str] = None) -> None:
+        """Append one entry to the log."""
         sanitized_timestamp = timestamp or _current_timestamp()
         line = _format_line(tag, str(payload), sanitized_timestamp)
         with self._lock:
@@ -95,6 +104,7 @@ class WorkingMemoryLog:
                 raise
 
     def load_summary_state(self) -> SummaryState:
+        """Read the summary state from the file."""
         with self._lock:
             try:
                 lines = self._path.read_text(encoding="utf-8").splitlines()
@@ -147,6 +157,7 @@ class WorkingMemoryLog:
         return state
 
     def write_summary_state(self, state: SummaryState) -> None:
+        """Write the summary state to the file."""
         meta_payload = json.dumps(
             {
                 "last_index": state.last_index,
@@ -179,6 +190,7 @@ class WorkingMemoryLog:
                         pass
 
     def render_transcript(self, state: Optional[SummaryState] = None) -> str:
+        """Render the summary and entries as a transcript."""
         snapshot = state or self.load_summary_state()
         parts: List[str] = []
 
@@ -199,6 +211,7 @@ class WorkingMemoryLog:
         return '\n'.join(parts)
 
     def clear(self) -> None:
+        """Delete the log contents."""
         with self._lock:
             try:
                 if self._path.exists():
@@ -213,6 +226,7 @@ class WorkingMemoryLog:
                 self._initialize_file_locked()
 
     def _parse_line(self, line: str) -> Optional[Tuple[str, Optional[str], str]]:
+        """Parse a line into (tag, timestamp, payload), or None."""
         stripped = line.strip()
         if not stripped.startswith("<") or "</" not in stripped:
             return None
@@ -245,6 +259,7 @@ _factory_lock = threading.Lock()
 
 
 def get_working_memory_log() -> WorkingMemoryLog:
+    """Return the process-wide working memory log."""
     global _working_memory_log
     if _working_memory_log is None:
         with _factory_lock:

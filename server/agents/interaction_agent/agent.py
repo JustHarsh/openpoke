@@ -19,13 +19,11 @@ _head, _, _rest = SYSTEM_PROMPT.partition(_ROUTING_START)
 TASK_SYSTEM_PROMPT = f"{_head}{_TASK_SECTION}\n\n{_ROUTING_END}{_rest.partition(_ROUTING_END)[2]}"
 
 
-# Load and return the pre-defined system prompt from markdown file
 def build_system_prompt() -> str:
     """Return the static system prompt for the interaction agent."""
     return TASK_SYSTEM_PROMPT if get_settings().variant == "redesign" else SYSTEM_PROMPT
 
 
-# Build structured message with conversation history, active agents, and current turn
 def prepare_message_with_history(
     latest_text: str,
     transcript: str,
@@ -43,8 +41,8 @@ def prepare_message_with_history(
     return [{"role": "user", "content": content}]
 
 
-# Format conversation transcript into XML tags for LLM context
 def _render_conversation_history(transcript: str) -> str:
+    """Format conversation transcript into XML tags for LLM context."""
     history = transcript.strip()
     if not history:
         history = "None"
@@ -72,8 +70,8 @@ def _render_active_agents(latest_text: str) -> str:
     return "\n".join(rendered)
 
 
-# Wrap the current message in appropriate XML tags based on sender type
 def _render_current_turn(latest_text: str, message_type: str) -> str:
+    """Wrap the current message in appropriate XML tags based on sender type."""
     tag = "new_agent_message" if message_type == "agent" else "new_user_message"
     body = latest_text.strip()
     return f"<{tag}>\n{body}\n</{tag}>"

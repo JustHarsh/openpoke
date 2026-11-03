@@ -15,12 +15,14 @@ class TimezoneStore:
     """Stores a single timezone string supplied by the client UI."""
 
     def __init__(self, path: Path):
+        """Set up the file path and load the stored timezone."""
         self._path = path
         self._lock = threading.Lock()
         self._cached: Optional[str] = None
         self._load()
 
     def _load(self) -> None:
+        """Read the stored timezone from disk."""
         try:
             value = self._path.read_text(encoding="utf-8").strip()
         except FileNotFoundError:
@@ -34,10 +36,12 @@ class TimezoneStore:
         self._cached = value or None
 
     def get_timezone(self, default: str = "UTC") -> str:
+        """Return the stored timezone, or the default."""
         with self._lock:
             return self._cached or default
 
     def set_timezone(self, timezone_name: str) -> None:
+        """Validate and store the timezone."""
         validated = self._validate(timezone_name)
         with self._lock:
             self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -46,6 +50,7 @@ class TimezoneStore:
             logger.info("updated timezone preference", extra={"timezone": validated})
 
     def clear(self) -> None:
+        """Forget the stored timezone."""
         with self._lock:
             self._cached = None
             try:
@@ -55,6 +60,7 @@ class TimezoneStore:
                 logger.warning("failed to clear timezone file", extra={"error": str(exc)})
 
     def _validate(self, timezone_name: str) -> str:
+        """Return a valid timezone name, or raise ValueError."""
         candidate = (timezone_name or "").strip()
         if not candidate:
             raise ValueError("timezone must be a non-empty string")
@@ -72,6 +78,7 @@ _timezone_store = TimezoneStore(_TIMEZONE_PATH)
 
 
 def get_timezone_store() -> TimezoneStore:
+    """Return the process-wide timezone store."""
     return _timezone_store
 
 

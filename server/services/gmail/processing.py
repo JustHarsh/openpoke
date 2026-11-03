@@ -18,6 +18,7 @@ class EmailTextCleaner:
     """Clean and extract readable text from Gmail API email responses."""
 
     def __init__(self, max_url_length: int = 60) -> None:
+        """Set the URL length limit and the HTML elements to remove."""
         self.max_url_length = max_url_length
         self.remove_elements = [
             "style",
@@ -48,7 +49,6 @@ class EmailTextCleaner:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    # Extract and clean email content from Gmail API message payload
     def clean_email_content(self, message: Dict[str, Any]) -> str:
         """Return cleaned plain-text representation of a Gmail message."""
 
@@ -61,8 +61,8 @@ class EmailTextCleaner:
             return self.post_process_text(text_content)
         return ""
 
-    # Clean HTML email content by removing unwanted elements and extracting text
     def clean_html_email(self, html_content: str) -> str:
+        """Clean HTML email content by removing unwanted elements and extracting text."""
         try:
             soup = BeautifulSoup(html_content, "html.parser")
 
@@ -102,6 +102,7 @@ class EmailTextCleaner:
             return self.fallback_text_extraction(html_content)
 
     def truncate_url(self, url: str) -> str:
+        """Shorten a URL longer than the limit."""
         if not url or len(url) <= self.max_url_length:
             return url
 
@@ -111,6 +112,7 @@ class EmailTextCleaner:
         return f"{url[: self.max_url_length]}..."
 
     def remove_tracking_params(self, url: str) -> str:
+        """Strip tracking query parameters from a URL."""
         try:
             from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -147,6 +149,7 @@ class EmailTextCleaner:
             return url
 
     def is_url_like(self, text: str) -> bool:
+        """True if the text looks like a URL."""
         if not text:
             return False
         lowered = text.lower()
@@ -155,6 +158,7 @@ class EmailTextCleaner:
         return "." in lowered and " " not in lowered and len(lowered.split(".")) >= 2
 
     def post_process_text(self, text: str) -> str:
+        """Unescape HTML and collapse extra whitespace."""
         text = html.unescape(text)
         text = re.sub(r"\n\s*\n\s*\n", "\n\n", text)
         text = re.sub(r"[ \t]+", " ", text)
@@ -184,11 +188,13 @@ class EmailTextCleaner:
         return text
 
     def fallback_text_extraction(self, html_content: str) -> str:
+        """Strip tags with regexes when HTML parsing fails."""
         stripped = re.sub(r"<[^>]+>", " ", html_content)
         stripped = re.sub(r"\s+", " ", stripped)
         return self.post_process_text(stripped)
 
     def _extract_html_body(self, message: Dict[str, Any]) -> Optional[str]:
+        """Return the HTML body of a Gmail message, if any."""
         payload = message.get("payload") or {}
         if isinstance(payload, dict):
             parts = payload.get("parts")
@@ -210,6 +216,7 @@ class EmailTextCleaner:
         return message.get("htmlBody")
 
     def _extract_plain_body(self, message: Dict[str, Any]) -> Optional[str]:
+        """Return the plain-text body of a Gmail message, if any."""
         payload = message.get("payload") or {}
         if isinstance(payload, dict):
             if body := payload.get("body"):
@@ -224,6 +231,7 @@ class EmailTextCleaner:
         return message.get("textBody")
 
     def extract_attachment_info(self, attachments: Iterable[Any]) -> Tuple[bool, int, List[str]]:
+        """Return (has_attachments, count, filenames) for a message."""
         filenames: List[str] = []
         count = 0
         for item in attachments or []:
@@ -257,8 +265,8 @@ class ProcessedEmail:
 # Helpers shared across modules
 # ----------------------------------------------------------------------
 
-# Parse Gmail timestamp string into timezone-aware datetime object
 def parse_gmail_timestamp(raw: Optional[str]) -> Optional[datetime]:
+    """Parse Gmail timestamp string into timezone-aware datetime object."""
     if not raw:
         return None
 
@@ -270,13 +278,13 @@ def parse_gmail_timestamp(raw: Optional[str]) -> Optional[datetime]:
         return None
 
 
-# Convert raw Gmail API message into a clean ProcessedEmail object
 def build_processed_email(
     message: Dict[str, Any],
     *,
     query: str,
     cleaner: Optional[EmailTextCleaner] = None,
 ) -> Optional[ProcessedEmail]:
+    """Convert raw Gmail API message into a clean ProcessedEmail object."""
     message_id = (message.get("messageId") or message.get("id") or "").strip()
     if not message_id:
         logger.warning("Skipping email with missing message ID")
@@ -323,13 +331,13 @@ def build_processed_email(
     )
 
 
-# Convert multiple raw Gmail messages into ProcessedEmail objects
 def build_processed_emails(
     messages: Sequence[Dict[str, Any]],
     *,
     query: str,
     cleaner: Optional[EmailTextCleaner] = None,
 ) -> List[ProcessedEmail]:
+    """Convert multiple raw Gmail messages into ProcessedEmail objects."""
     processed: List[ProcessedEmail] = []
     for message in messages:
         if not isinstance(message, dict):
@@ -340,7 +348,6 @@ def build_processed_emails(
     return processed
 
 
-# Parse Composio Gmail API response and extract clean email data with pagination
 def parse_gmail_fetch_response(
     raw_result: Any,
     *,

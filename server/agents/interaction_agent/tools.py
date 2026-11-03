@@ -241,7 +241,6 @@ def send_message_to_agent(
     )
 
 
-# Send immediate message to user and record in conversation history
 def send_message_to_user(message: str) -> ToolResult:
     """Record a user-visible reply in the conversation log."""
     log = get_conversation_log()
@@ -255,7 +254,6 @@ def send_message_to_user(message: str) -> ToolResult:
     )
 
 
-# Format and record email draft for user review
 def send_draft(
     to: str,
     subject: str,
@@ -303,7 +301,6 @@ async def find_tasks_tool(query: str, kind: Optional[str] = None) -> ToolResult:
     )
 
 
-# Record silent wait state to avoid duplicate responses
 def wait(reason: str) -> ToolResult:
     """Wait silently and add a wait log entry that is not visible to the user."""
     log = get_conversation_log()
@@ -330,7 +327,6 @@ def get_tool_schemas():
     return TOOL_SCHEMAS
 
 
-# Route tool calls to appropriate handlers with argument validation and error handling
 def handle_tool_call(name: str, arguments: Any) -> ToolResult:
     """Handle tool calls from interaction agent."""
     try:

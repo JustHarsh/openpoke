@@ -27,6 +27,7 @@ class TriggerService:
     """High-level trigger management with recurrence awareness."""
 
     def __init__(self, store: TriggerStore):
+        """Set up the service over a trigger store."""
         self._store = store
 
     def create_trigger(
@@ -39,6 +40,7 @@ class TriggerService:
         timezone_name: Optional[str] = None,
         status: Optional[str] = None,
     ) -> TriggerRecord:
+        """Create a trigger and compute its first fire time."""
         tz = resolve_timezone(timezone_name)
         now = utc_now()
         start_dt_local = coerce_start_datetime(start_time, tz, now)
@@ -81,6 +83,7 @@ class TriggerService:
         last_error: Optional[str] = None,
         clear_error: bool = False,
     ) -> Optional[TriggerRecord]:
+        """Update a trigger's fields and recompute its next fire time."""
         existing = self._store.fetch_one(trigger_id, agent_name)
         if existing is None:
             return None
@@ -181,15 +184,18 @@ class TriggerService:
         return self._store.fetch_one(trigger_id, agent_name) if updated else existing
 
     def list_triggers(self, *, agent_name: str) -> List[TriggerRecord]:
+        """List an agent's triggers."""
         return self._store.list_for_agent(agent_name)
 
     def get_due_triggers(
         self, *, before: datetime, agent_name: Optional[str] = None
     ) -> List[TriggerRecord]:
+        """Return active triggers due at or before the cutoff."""
         iso_cutoff = to_storage_timestamp(before)
         return self._store.fetch_due(agent_name, iso_cutoff)
 
     def mark_as_completed(self, trigger_id: int, *, agent_name: str) -> None:
+        """Mark a trigger completed."""
         self._store.update(
             trigger_id,
             agent_name,
@@ -206,6 +212,7 @@ class TriggerService:
         *,
         fired_at: datetime,
     ) -> Optional[TriggerRecord]:
+        """Schedule the next run of a recurring trigger, or complete a one-off."""
         if not trigger.recurrence_rule:
             self.mark_as_completed(trigger.id, agent_name=trigger.agent_name)
             return self._store.fetch_one(trigger.id, trigger.agent_name)
@@ -222,6 +229,7 @@ class TriggerService:
         return self._store.fetch_one(trigger.id, trigger.agent_name)
 
     def record_failure(self, trigger: TriggerRecord, error: str) -> None:
+        """Record the error from a failed run."""
         self._store.update(
             trigger.id,
             trigger.agent_name,
@@ -231,6 +239,7 @@ class TriggerService:
         )
 
     def clear_next_fire(self, trigger_id: int, *, agent_name: str) -> Optional[TriggerRecord]:
+        """Clear a trigger's next fire time."""
         self._store.update(
             trigger_id,
             agent_name,
@@ -241,6 +250,7 @@ class TriggerService:
         return self._store.fetch_one(trigger_id, agent_name)
 
     def clear_all(self) -> None:
+        """Delete every trigger."""
         self._store.clear_all()
 
     def _compute_next_fire(
@@ -251,6 +261,7 @@ class TriggerService:
         tz: ZoneInfo,
         now: datetime,
     ) -> Optional[datetime]:
+        """Compute the first fire time from the recurrence rule or start time."""
         if stored_recurrence:
             rule = load_rrule(stored_recurrence)
             next_occurrence = rule.after(now.astimezone(tz), inc=True)
@@ -273,6 +284,7 @@ class TriggerService:
         fired_at: datetime,
         tz: ZoneInfo,
     ) -> Optional[datetime]:
+        """Compute the next fire time after a run."""
         rule = load_rrule(stored_recurrence)
         next_occurrence = rule.after(fired_at.astimezone(tz), inc=False)
         if next_occurrence is None:

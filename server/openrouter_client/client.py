@@ -19,6 +19,7 @@ class OpenRouterError(RuntimeError):
 
 
 def _headers(*, api_key: Optional[str] = None) -> Dict[str, str]:
+    """Build the request headers from the explicit or configured API key."""
     settings = get_settings()
     key = (api_key or settings.openrouter_api_key or "").strip()
     if not key:
@@ -34,12 +35,14 @@ def _headers(*, api_key: Optional[str] = None) -> Dict[str, str]:
 
 
 def _build_messages(messages: List[Dict[str, str]], system: Optional[str]) -> List[Dict[str, str]]:
+    """Prepend the system prompt, if any, to the messages."""
     if system:
         return [{"role": "system", "content": system}, *messages]
     return messages
 
 
 def _handle_response_error(exc: httpx.HTTPStatusError) -> None:
+    """Turn an HTTP error response into a readable error."""
     response = exc.response
     detail: str
     try:

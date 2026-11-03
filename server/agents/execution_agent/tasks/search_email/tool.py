@@ -47,14 +47,12 @@ _LOG_STORE = get_execution_agent_logs()
 _EMAIL_CLEANER = EmailTextCleaner(max_url_length=40)
 
 
-# Create standardized error response for tool calls
 def _create_error_response(call_id: str, query: Optional[str], error: str) -> Tuple[str, str]:
     """Create standardized error response for tool calls."""
     result = EmailSearchToolResult(status="error", query=query, error=error)
     return (call_id, _safe_json_dumps(result.model_dump(exclude_none=True)))
 
 
-# Create standardized success response for tool calls
 def _create_success_response(call_id: str, data: Dict[str, Any]) -> Tuple[str, str]:
     """Create standardized success response for tool calls."""
     return (call_id, _safe_json_dumps(data))
@@ -81,7 +79,6 @@ def _validate_openrouter_config() -> Tuple[Optional[str], Optional[str]]:
     return api_key, settings.execution_agent_search_model
 
 
-# Return task tool callables
 def build_registry(agent_name: str) -> Dict[str, Callable[..., Any]]:  # noqa: ARG001
     """Return task tool callables."""
 
@@ -90,7 +87,6 @@ def build_registry(agent_name: str) -> Dict[str, Callable[..., Any]]:  # noqa: A
     }
 
 
-# Run an agentic Gmail search for the provided query
 async def task_email_search(search_query: str) -> Any:
     """Run an agentic Gmail search for the provided query."""
     logger.info(f"[EMAIL_SEARCH] Starting search for: '{search_query}'")
@@ -125,7 +121,6 @@ async def task_email_search(search_query: str) -> Any:
         return {"error": f"Email search failed: {exc}"}
 
 
-# Execute the main email search orchestration loop
 async def _run_email_search(
     *,
     search_query: str,
@@ -209,13 +204,11 @@ async def _run_email_search(
 
 
 
-# Create user message for the LLM with search context
 def _render_user_message(search_query: str) -> str:
     """Create user message for the LLM with search context."""
     return f"Please help me find emails: {search_query}"
 
 
-# Execute tool calls from LLM and process search/completion responses
 async def _execute_tool_calls(
     *,
     tool_calls: List[Dict[str, Any]],
@@ -223,6 +216,7 @@ async def _execute_tool_calls(
     emails: Dict[str, GmailSearchEmail],
     composio_user_id: str,
 ) -> Tuple[List[Tuple[str, str]], Optional[List[str]]]:
+    """Execute tool calls from LLM and process search/completion responses."""
     responses: List[Tuple[str, str]] = []
     completion_ids: Optional[List[str]] = None
 
@@ -279,7 +273,6 @@ async def _execute_tool_calls(
     return responses, completion_ids
 
 
-# Perform Gmail search using Composio and process results
 async def _perform_search(
     *,
     arguments: Dict[str, Any],
@@ -287,6 +280,7 @@ async def _perform_search(
     emails: Dict[str, GmailSearchEmail],
     composio_user_id: str,
 ) -> EmailSearchToolResult:
+    """Perform Gmail search using Composio and process results."""
     query = (arguments.get("query") or "").strip()
     if within := (arguments.get("within") or "").strip():
         try:
@@ -353,13 +347,13 @@ async def _perform_search(
     )
 
 
-# Build final response with selected emails and logging
 def _build_response(
     queries: List[str],
     emails: Dict[str, GmailSearchEmail],
     selected_ids: Sequence[str],
 ) -> List[Dict[str, Any]]:
     # Deduplicate queries while preserving order
+    """Build final response with selected emails and logging."""
     unique_queries = list(dict.fromkeys(queries))
     
     # Deduplicate and filter valid email IDs efficiently

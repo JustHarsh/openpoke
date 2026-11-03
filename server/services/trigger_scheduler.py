@@ -16,10 +16,12 @@ UTC = timezone.utc
 
 
 def _utc_now() -> datetime:
+    """Current time in UTC."""
     return datetime.now(UTC)
 
 
 def _isoformat(dt: datetime) -> str:
+    """Format a datetime as UTC ISO text ending in Z."""
     return dt.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
@@ -27,6 +29,7 @@ class TriggerScheduler:
     """Polls stored triggers and launches execution agents when due."""
 
     def __init__(self, poll_interval_seconds: float = 10.0) -> None:
+        """Set up the poll interval and the trigger service."""
         self._poll_interval = poll_interval_seconds
         self._service = get_trigger_service()
         self._task: Optional[asyncio.Task[None]] = None
@@ -35,6 +38,7 @@ class TriggerScheduler:
         self._lock = asyncio.Lock()
 
     async def start(self) -> None:
+        """Start the polling task if it is not already running."""
         async with self._lock:
             if self._task and not self._task.done():
                 return
@@ -44,6 +48,7 @@ class TriggerScheduler:
             logger.info("Trigger scheduler started", extra={"interval": self._poll_interval})
 
     async def stop(self) -> None:
+        """Stop the polling task."""
         async with self._lock:
             self._running = False
             if self._task:
@@ -56,6 +61,7 @@ class TriggerScheduler:
                 logger.info("Trigger scheduler stopped")
 
     async def _run(self) -> None:
+        """Poll for due triggers in a loop until stopped."""
         try:
             while self._running:
                 await self._poll_once()
@@ -66,6 +72,7 @@ class TriggerScheduler:
             logger.exception("Trigger scheduler loop crashed", extra={"error": str(exc)})
 
     async def _poll_once(self) -> None:
+        """Run every trigger that is due."""
         now = _utc_now()
         due_triggers = self._service.get_due_triggers(before=now)
         if not due_triggers:
@@ -78,6 +85,7 @@ class TriggerScheduler:
             asyncio.create_task(self._execute_trigger(trigger), name=f"trigger-{trigger.id}")
 
     async def _execute_trigger(self, trigger: TriggerRecord) -> None:
+        """Send a due trigger's instructions to its agent and record the outcome."""
         try:
             fired_at = _utc_now()
             instructions = self._format_instructions(trigger, fired_at)
@@ -109,6 +117,7 @@ class TriggerScheduler:
             self._in_flight.discard(trigger.id)
 
     def _handle_success(self, trigger: TriggerRecord, fired_at: datetime) -> None:
+        """Log a completed trigger."""
         logger.info(
             "Trigger completed",
             extra={"trigger_id": trigger.id, "agent": trigger.agent_name},
@@ -116,6 +125,7 @@ class TriggerScheduler:
         self._service.schedule_next_occurrence(trigger, fired_at=fired_at)
 
     def _handle_failure(self, trigger: TriggerRecord, fired_at: datetime, error: str) -> None:
+        """Log and record a failed trigger."""
         logger.warning(
             "Trigger execution failed",
             extra={
@@ -131,6 +141,7 @@ class TriggerScheduler:
             self._service.clear_next_fire(trigger.id, agent_name=trigger.agent_name)
 
     def _format_instructions(self, trigger: TriggerRecord, fired_at: datetime) -> str:
+        """Build the instruction text for a fired trigger."""
         scheduled_for = trigger.next_trigger or _isoformat(fired_at)
         metadata_lines = [f"Trigger ID: {trigger.id}"]
         if trigger.recurrence_rule:
@@ -153,6 +164,7 @@ _scheduler_instance: Optional[TriggerScheduler] = None
 
 
 def get_trigger_scheduler() -> TriggerScheduler:
+    """Return the process-wide trigger scheduler."""
     global _scheduler_instance
     if _scheduler_instance is None:
         _scheduler_instance = TriggerScheduler()

@@ -12,18 +12,21 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 async def chat_send(
     payload: ChatRequest,
 ) -> JSONResponse:
+    """Send a chat message to the interaction agent."""
     return await handle_chat_request(payload)
 
 
 @router.get("/history", response_model=ChatHistoryResponse)
 # Retrieve the conversation history from the log
 def chat_history() -> ChatHistoryResponse:
+    """Return the conversation history."""
     log = get_conversation_log()
     return ChatHistoryResponse(messages=log.to_chat_messages())
 
 
 @router.delete("/history", response_model=ChatHistoryClearResponse)
 def clear_history() -> ChatHistoryClearResponse:
+    """Clear the conversation, agent logs and roster."""
     from ..services import get_execution_agent_logs, get_agent_roster
 
     # Clear conversation log

@@ -101,6 +101,7 @@ _COMPLETION_SCHEMAS: List[Dict[str, Any]] = [
 ]
 
 def get_completion_schema() -> Dict[str, Any]:
+    """Return the completion tool schema."""
     return _COMPLETION_SCHEMAS[0]
 
 

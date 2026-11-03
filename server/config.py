@@ -33,6 +33,7 @@ DEFAULT_APP_VERSION = "0.3.0"
 
 
 def _env_int(name: str, fallback: int) -> int:
+    """Read an int from the environment, or the fallback if it is unset or not a number."""
     try:
         return int(os.getenv(name, str(fallback)))
     except (TypeError, ValueError):

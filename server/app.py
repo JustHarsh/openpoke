@@ -13,10 +13,11 @@ from .routes import api_router
 from .services import get_important_email_watcher, get_trigger_scheduler
 
 
-# Register global exception handlers for consistent error responses across the API
 def register_exception_handlers(app: FastAPI) -> None:
+    """Register global exception handlers for consistent error responses across the API."""
     @app.exception_handler(RequestValidationError)
     async def _validation_exception_handler(request: Request, exc: RequestValidationError):
+        """Return a JSON error for an invalid request."""
         logger.debug("validation error", extra={"errors": exc.errors(), "path": str(request.url)})
         return JSONResponse(
             {"ok": False, "error": "Invalid request", "detail": exc.errors()},
@@ -25,6 +26,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(HTTPException)
     async def _http_exception_handler(request: Request, exc: HTTPException):
+        """Return a JSON error for an HTTPException."""
         logger.debug(
             "http error",
             extra={"detail": exc.detail, "status": exc.status_code, "path": str(request.url)},
@@ -36,6 +38,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def _unhandled_exception_handler(request: Request, exc: Exception):
+        """Log an unexpected error and return a generic JSON error."""
         logger.exception("Unhandled error", extra={"path": str(request.url)})
         return JSONResponse(
             {"ok": False, "error": "Internal server error"},
@@ -68,6 +71,7 @@ app.include_router(api_router)
 @app.on_event("startup")
 # Initialize background services (trigger scheduler and email watcher) when the app starts
 async def _start_trigger_scheduler() -> None:
+    """Start the trigger scheduler and the important-email watcher on startup."""
     scheduler = get_trigger_scheduler()
     await scheduler.start()
     watcher = get_important_email_watcher()
@@ -77,6 +81,7 @@ async def _start_trigger_scheduler() -> None:
 @app.on_event("shutdown")
 # Gracefully shutdown background services when the app stops
 async def _stop_trigger_scheduler() -> None:
+    """Stop the trigger scheduler and the important-email watcher on shutdown."""
     scheduler = get_trigger_scheduler()
     await scheduler.stop()
     watcher = get_important_email_watcher()

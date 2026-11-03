@@ -12,6 +12,7 @@ class AgentRoster:
     """Simple roster that stores agent names in a JSON file."""
 
     def __init__(self, roster_path: Path):
+        """Set up the roster file and load it."""
         self._roster_path = roster_path
         self._agents: list[str] = []
         self.load()

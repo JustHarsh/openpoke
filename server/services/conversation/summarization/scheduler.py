@@ -24,6 +24,7 @@ def schedule_summarization() -> None:
 
 
 async def _run_worker() -> None:
+    """Run the summarizer, skipping if one is already running."""
     global _pending, _running
     if _running:
         return

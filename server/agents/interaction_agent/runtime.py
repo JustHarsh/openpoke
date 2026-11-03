@@ -49,8 +49,8 @@ class InteractionAgentRuntime:
 
     MAX_TOOL_ITERATIONS = 8
 
-    # Initialize interaction agent runtime with settings and service dependencies
     def __init__(self) -> None:
+        """Initialize interaction agent runtime with settings and service dependencies."""
         settings = get_settings()
         self.api_key = settings.openrouter_api_key
         self.model = settings.interaction_agent_model
@@ -64,7 +64,6 @@ class InteractionAgentRuntime:
                 "OpenRouter API key not configured. Set OPENROUTER_API_KEY environment variable."
             )
 
-    # Main entry point for processing user messages through the LLM interaction loop
     async def execute(self, user_message: str) -> InteractionResult:
         """Handle a user-authored message."""
 
@@ -99,7 +98,6 @@ class InteractionAgentRuntime:
                 error=str(exc),
             )
 
-    # Handle incoming messages from execution agents and generate appropriate responses
     async def handle_agent_message(self, agent_message: str) -> InteractionResult:
         """Process a status update emitted by an execution agent."""
 
@@ -134,7 +132,6 @@ class InteractionAgentRuntime:
                 error=str(exc),
             )
 
-    # Core interaction loop that handles LLM calls and tool executions until completion
     async def _run_interaction_loop(
         self,
         system_prompt: str,
@@ -193,15 +190,14 @@ class InteractionAgentRuntime:
 
         return summary
 
-    # Load conversation history, preferring summarized version if available
     def _load_conversation_transcript(self) -> str:
+        """Load conversation history, preferring summarized version if available."""
         if self.settings.summarization_enabled:
             rendered = self.working_memory_log.render_transcript()
             if rendered.strip():
                 return rendered
         return self.conversation_log.load_transcript()
 
-    # Execute API call to OpenRouter with system prompt, messages, and tool schemas
     async def _make_llm_call(
         self,
         system_prompt: str,
@@ -222,7 +218,6 @@ class InteractionAgentRuntime:
             purpose="interaction_agent",
         )
 
-    # Extract the assistant's message from the OpenRouter API response structure
     def _extract_assistant_message(self, response: Dict[str, Any]) -> Dict[str, Any]:
         """Return the assistant message from the raw response payload."""
 
@@ -232,7 +227,6 @@ class InteractionAgentRuntime:
             raise RuntimeError("LLM response did not include an assistant message")
         return message
 
-    # Convert raw LLM tool calls into structured _ToolCall objects with validation
     def _parse_tool_calls(self, raw_tool_calls: List[Dict[str, Any]]) -> List[_ToolCall]:
         """Normalize tool call payloads from the LLM."""
 
@@ -262,7 +256,6 @@ class InteractionAgentRuntime:
 
         return parsed
 
-    # Parse and validate tool arguments from various formats (dict, JSON string, etc.)
     def _parse_tool_arguments(
         self, raw_arguments: Any
     ) -> tuple[Dict[str, Any], Optional[str]]:
@@ -340,7 +333,6 @@ class InteractionAgentRuntime:
         self._log_tool_invocation(tool_call, stage="done", result=result)
         return result
 
-    # Format tool execution results into JSON for LLM consumption
     def _format_tool_result(self, tool_call: _ToolCall, result: ToolResult) -> str:
         """Render a tool execution result back to the LLM."""
 
@@ -360,7 +352,6 @@ class InteractionAgentRuntime:
 
         return self._safe_json_dump(payload)
 
-    # Safely serialize objects to JSON with fallback to string representation
     def _safe_json_dump(self, payload: Any) -> str:
         """Serialize payload to JSON, falling back to repr on failure."""
 
@@ -369,7 +360,6 @@ class InteractionAgentRuntime:
         except TypeError:
             return repr(payload)
 
-    # Log tool execution stages (start, done, error) with structured metadata
     def _log_tool_invocation(
         self,
         tool_call: _ToolCall,
@@ -407,7 +397,6 @@ class InteractionAgentRuntime:
         else:
             logger.debug(f"Tool '{tool_call.name}' {stage}")
 
-    # Determine final user-facing response from interaction loop summary
     def _finalize_response(self, summary: _LoopSummary) -> str:
         """Decide what text should be exposed to the user as the final reply."""
 

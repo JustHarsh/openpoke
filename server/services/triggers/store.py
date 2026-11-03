@@ -14,12 +14,14 @@ class TriggerStore:
     """Low-level persistence for triggers backed by SQLite."""
 
     def __init__(self, db_path: Path):
+        """Set up the SQLite file path and schema."""
         self._db_path = db_path
         self._lock = threading.Lock()
         self._ensure_directory()
         self._ensure_schema()
 
     def _ensure_directory(self) -> None:
+        """Create the database directory if needed."""
         try:
             self._db_path.parent.mkdir(parents=True, exist_ok=True)
         except Exception as exc:  # pragma: no cover - defensive
@@ -29,11 +31,13 @@ class TriggerStore:
             )
 
     def _connect(self) -> sqlite3.Connection:
+        """Open a SQLite connection whose rows can be read by column name."""
         conn = sqlite3.connect(self._db_path, timeout=30, isolation_level=None)
         conn.row_factory = sqlite3.Row
         return conn
 
     def _ensure_schema(self) -> None:
+        """Create the triggers table if it does not exist."""
         schema_sql = """
         CREATE TABLE IF NOT EXISTS triggers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,6 +63,7 @@ class TriggerStore:
             conn.execute(index_sql)
 
     def insert(self, payload: Dict[str, Any]) -> int:
+        """Insert a trigger and return its id."""
         with self._lock, self._connect() as conn:
             columns = ", ".join(payload.keys())
             placeholders = ", ".join([":" + key for key in payload.keys()])
@@ -68,6 +73,7 @@ class TriggerStore:
             return int(trigger_id)
 
     def fetch_one(self, trigger_id: int, agent_name: str) -> Optional[TriggerRecord]:
+        """Return one trigger by id and agent, or None."""
         with self._lock, self._connect() as conn:
             row = conn.execute(
                 "SELECT * FROM triggers WHERE id = ? AND agent_name = ?",
@@ -76,6 +82,7 @@ class TriggerStore:
         return self._row_to_record(row) if row else None
 
     def update(self, trigger_id: int, agent_name: str, fields: Dict[str, Any]) -> bool:
+        """Update a trigger's fields; True if a row changed."""
         if not fields:
             return False
         assignments = ", ".join(f"{key} = :{key}" for key in fields.keys())
@@ -94,6 +101,7 @@ class TriggerStore:
             return cursor.rowcount > 0
 
     def list_for_agent(self, agent_name: str) -> List[TriggerRecord]:
+        """List an agent's triggers, soonest first."""
         with self._lock, self._connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM triggers WHERE agent_name = ? ORDER BY next_trigger IS NULL, next_trigger",
@@ -104,6 +112,7 @@ class TriggerStore:
     def fetch_due(
         self, agent_name: Optional[str], before_iso: str
     ) -> List[TriggerRecord]:
+        """Return active triggers due at or before the cutoff."""
         sql = (
             "SELECT * FROM triggers WHERE status = 'active' AND next_trigger IS NOT NULL"
             " AND next_trigger <= ?"
@@ -118,10 +127,12 @@ class TriggerStore:
         return [self._row_to_record(row) for row in rows]
 
     def clear_all(self) -> None:
+        """Delete every trigger."""
         with self._lock, self._connect() as conn:
             conn.execute("DELETE FROM triggers")
 
     def _row_to_record(self, row: sqlite3.Row) -> TriggerRecord:
+        """Build a TriggerRecord from a database row."""
         data = dict(row)
         return TriggerRecord.model_validate(data)
 

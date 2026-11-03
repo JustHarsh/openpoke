@@ -56,6 +56,7 @@ _SYSTEM_PROMPT = (
 
 
 def _format_email_payload(email: ProcessedEmail) -> str:
+    """Render an email's fields as text for the classifier prompt."""
     attachments = ", ".join(email.attachment_filenames) if email.attachment_filenames else "None"
     labels = ", ".join(email.label_ids) if email.label_ids else "None"
     header_lines = [
@@ -154,6 +155,7 @@ async def classify_email_importance(email: ProcessedEmail) -> Optional[str]:
 
 
 def _coerce_arguments(raw: Any) -> Optional[Dict[str, Any]]:
+    """Turn raw tool-call arguments into a dict, or None if invalid."""
     if raw is None:
         return {}
     if isinstance(raw, dict):

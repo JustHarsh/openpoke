@@ -11,6 +11,7 @@ from .config import get_settings
 
 
 def main() -> None:
+    """Run the API server, with host and port from settings or the command line."""
     settings = get_settings()
     default_host = settings.server_host
     default_port = settings.server_port

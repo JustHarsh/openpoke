@@ -26,6 +26,7 @@ class SummaryState:
 
     @classmethod
     def empty(cls) -> "SummaryState":
+        """Return an empty summary state."""
         return cls()
 
 

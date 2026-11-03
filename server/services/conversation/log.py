@@ -22,25 +22,30 @@ _CONVERSATION_LOG_PATH = _DATA_DIR / "conversation" / "poke_conversation.log"
 
 class TranscriptFormatter(Protocol):
     def __call__(self, tag: str, timestamp: str, payload: str) -> str:  # pragma: no cover - typing protocol
+        """Format one log entry as a line."""
         ...
 
 
 def _encode_payload(payload: str) -> str:
+    """Escape a payload and fold newlines so it fits on one line."""
     normalized = payload.replace("\r\n", "\n").replace("\r", "\n")
     collapsed = normalized.replace("\n", "\\n")
     return escape(collapsed, quote=False)
 
 
 def _decode_payload(payload: str) -> str:
+    """Reverse _encode_payload."""
     return unescape(payload).replace("\\n", "\n")
 
 
 def _default_formatter(tag: str, timestamp: str, payload: str) -> str:
+    """Format one log entry as a tagged line."""
     encoded = _encode_payload(payload)
     return f"<{tag} timestamp=\"{timestamp}\">{encoded}</{tag}>\n"
 
 
 def _resolve_working_memory_log() -> "WorkingMemoryLog":
+    """Return the working memory log (imported lazily)."""
     from .summarization import get_working_memory_log
 
     return get_working_memory_log()
@@ -53,6 +58,7 @@ class ConversationLog:
     """Append-only conversation log persisted to disk for the interaction agent."""
 
     def __init__(self, path: Path, formatter: TranscriptFormatter = _default_formatter):
+        """Set up the log file path, formatter and lock."""
         self._path = path
         self._formatter = formatter
         self._lock = threading.Lock()
@@ -60,12 +66,14 @@ class ConversationLog:
         self._working_memory_log = _resolve_working_memory_log()
 
     def _ensure_directory(self) -> None:
+        """Create the log directory if needed."""
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("conversation log directory creation failed", extra={"error": str(exc)})
 
     def _append(self, tag: str, payload: str) -> str:
+        """Append one entry and return its timestamp."""
         timestamp = now_in_user_timezone("%Y-%m-%d %H:%M:%S")
         entry = self._formatter(tag, timestamp, str(payload))
         with self._lock:
@@ -82,6 +90,7 @@ class ConversationLog:
         return timestamp
 
     def _parse_line(self, line: str) -> Optional[Tuple[str, str, str]]:
+        """Parse a log line into (tag, timestamp, payload), or None."""
         stripped = line.strip()
         if not stripped.startswith("<") or "</" not in stripped:
             return None
@@ -108,6 +117,7 @@ class ConversationLog:
         return tag, timestamp, _decode_payload(payload)
 
     def iter_entries(self) -> Iterator[Tuple[str, str, str]]:
+        """Yield (tag, timestamp, payload) for every entry."""
         with self._lock:
             try:
                 lines = self._path.read_text(encoding="utf-8").splitlines()
@@ -124,6 +134,7 @@ class ConversationLog:
                 yield item
 
     def load_transcript(self) -> str:
+        """Return the whole log as one transcript string."""
         parts: List[str] = []
         for tag, timestamp, payload in self.iter_entries():
             safe_payload = escape(payload, quote=False)
@@ -134,14 +145,17 @@ class ConversationLog:
         return "\n".join(parts)
 
     def record_user_message(self, content: str) -> None:
+        """Log a user message."""
         timestamp = self._append("user_message", content)
         self._working_memory_log.append_entry("user_message", content, timestamp)
 
     def record_agent_message(self, content: str) -> None:
+        """Log a message from an execution agent."""
         timestamp = self._append("agent_message", content)
         self._working_memory_log.append_entry("agent_message", content, timestamp)
 
     def record_reply(self, content: str) -> None:
+        """Log a reply shown to the user."""
         timestamp = self._append("poke_reply", content)
         self._working_memory_log.append_entry("poke_reply", content, timestamp)
 
@@ -151,6 +165,7 @@ class ConversationLog:
         self._working_memory_log.append_entry("wait", reason, timestamp)
 
     def _notify_summarization(self) -> None:
+        """Tell the summarizer a new entry arrived, if summarization is enabled."""
         settings = get_settings()
         if not settings.summarization_enabled:
             return
@@ -173,6 +188,7 @@ class ConversationLog:
             )
 
     def to_chat_messages(self) -> List[ChatMessage]:
+        """Return the log as chat messages for the UI."""
         messages: List[ChatMessage] = []
         for tag, timestamp, payload in self.iter_entries():
             normalized_timestamp = timestamp or None
@@ -192,6 +208,7 @@ class ConversationLog:
         return messages
 
     def clear(self) -> None:
+        """Delete the log contents."""
         with self._lock:
             try:
                 if self._path.exists():
@@ -215,6 +232,7 @@ _conversation_log = ConversationLog(_CONVERSATION_LOG_PATH)
 
 
 def get_conversation_log() -> ConversationLog:
+    """Return the process-wide conversation log."""
     return _conversation_log
 
 

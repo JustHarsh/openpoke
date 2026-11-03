@@ -43,12 +43,14 @@ class ExecutionAgentLogStore:
     """Append-only journal for execution agents with XML-style tags."""
 
     def __init__(self, base_dir: Path):
+        """Set up the per-agent log directory and locks."""
         self._base_dir = base_dir
         self._locks: dict[str, threading.Lock] = {}
         self._global_lock = threading.Lock()
         self._ensure_directory()
 
     def _ensure_directory(self) -> None:
+        """Create the log directory if needed."""
         try:
             self._base_dir.mkdir(parents=True, exist_ok=True)
         except Exception as exc:

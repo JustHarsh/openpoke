@@ -15,12 +15,14 @@ if TYPE_CHECKING:  # pragma: no cover - type checking only
 
 
 def _resolve_conversation_log() -> "ConversationLog":
+    """Return the conversation log (imported lazily)."""
     from ..log import get_conversation_log
 
     return get_conversation_log()
 
 
 def _collect_entries(log) -> List[LogEntry]:
+    """Read all log entries as LogEntry objects."""
     entries: List[LogEntry] = []
     for index, (tag, timestamp, payload) in enumerate(log.iter_entries()):
         entries.append(LogEntry(tag=tag, payload=payload, index=index, timestamp=timestamp or None))
@@ -28,6 +30,7 @@ def _collect_entries(log) -> List[LogEntry]:
 
 
 async def _call_openrouter(prompt: SummaryPrompt, model: str, api_key: Optional[str]) -> str:
+    """Ask the model for a summary, retrying once."""
     last_error: Exception | None = None
     for attempt in range(2):
         try:
@@ -72,6 +75,7 @@ async def _call_openrouter(prompt: SummaryPrompt, model: str, api_key: Optional[
 
 
 async def summarize_conversation() -> bool:
+    """Update the memory summary from the conversation log; True on success."""
     settings = get_settings()
     if not settings.summarization_enabled:
         return False
