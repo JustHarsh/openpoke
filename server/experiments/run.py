@@ -22,6 +22,7 @@ RUNS = HERE / "runs"
 
 
 def _git(*args: str) -> str:
+    """Output of a git command, or empty on failure."""
     try:
         return subprocess.run(["git", *args], cwd=HERE, capture_output=True, text=True).stdout.strip()
     except Exception:
@@ -29,6 +30,7 @@ def _git(*args: str) -> str:
 
 
 def _run_one(run_dir: Path, scenario_id: str, rep: int, n, variant: str, extra_env: dict) -> dict:
+    """Run one scenario in a subprocess with its own data dir; return its exit code and cost."""
     out = run_dir / f"{scenario_id}__{variant}__n{n if n is not None else 'default'}__r{rep}"
     env = {**os.environ, "OPENPOKE_DATA_DIR": str(out / "data"), "OPENPOKE_MOCK_GMAIL": "1", "OPENPOKE_VARIANT": variant, **extra_env}
     if n is not None:
@@ -49,8 +51,8 @@ def _run_one(run_dir: Path, scenario_id: str, rep: int, n, variant: str, extra_e
     return {"scenario": scenario_id, "rep": rep, "exit": proc.returncode, "cost": cost, "no_credits": no_credits}
 
 
-# Number of failed LLM calls in one run, and whether any was an out-of-credits (402) error
 def _run_errors(out: Path) -> tuple:
+    """Count failed LLM calls in one run and whether any was a 402 (out of credits)."""
     log = out / "data" / "usage" / "llm_calls.jsonl"
     if not log.exists():
         return 0, False
@@ -58,8 +60,8 @@ def _run_errors(out: Path) -> tuple:
     return len(errors), any("402" in (e.get("error") or "") for e in errors)
 
 
-# Dollars spent by one scenario run, from its own usage log
 def _run_cost(out: Path) -> float:
+    """Dollars spent by one scenario run, from its own usage log."""
     log = out / "data" / "usage" / "llm_calls.jsonl"
     if not log.exists():
         return 0.0
@@ -67,6 +69,7 @@ def _run_cost(out: Path) -> float:
 
 
 def main() -> None:
+    """Run the scenario sweep."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--label", default="run")
     ap.add_argument("--scenarios", default="all")
@@ -112,6 +115,7 @@ def main() -> None:
     lock = threading.Lock()
 
     def job(j):
+        """Run one job unless the cost cap or the credit limit stopped the sweep."""
         with lock:
             if spent.get("no_credits") or (a.max_cost is not None and spent["total"] >= a.max_cost):
                 return None  # cap reached or account out of credits: skip the remaining runs

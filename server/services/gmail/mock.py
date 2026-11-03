@@ -31,6 +31,7 @@ _INBOX = [
 
 
 def enabled() -> bool:
+    """True when OPENPOKE_MOCK_GMAIL=1."""
     return os.getenv("OPENPOKE_MOCK_GMAIL") == "1"
 
 
@@ -48,6 +49,7 @@ def _time_bounds(query: str, now: datetime):
 
 
 def _messages(query: str, max_results: int) -> List[Dict[str, Any]]:
+    """Return mock messages inside the query's time window, up to max_results."""
     now = datetime.now(timezone.utc)
     after, before = _time_bounds(query or "", now)
     words = [w.lower() for w in (query or "").split() if ":" not in w and w.lower() not in {"or", "and"}]
@@ -77,6 +79,7 @@ def _messages(query: str, max_results: int) -> List[Dict[str, Any]]:
 
 
 def execute(tool_name: str, arguments: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Answer a Gmail tool call from the mock inbox; writes are acknowledged, never sent."""
     args = arguments or {}
     if tool_name in {t.strip() for t in os.getenv("OPENPOKE_MOCK_GMAIL_FAIL", "").split(",") if t.strip()}:
         raise RuntimeError(f"{tool_name} failed (injected)")

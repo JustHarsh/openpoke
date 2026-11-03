@@ -26,12 +26,14 @@ CATEGORY_COLS = [
 
 
 def _jsonl(path: Path):
+    """Read a JSON-lines file; an empty list if it is missing."""
     if not path.exists():
         return []
     return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
 
 
 def _pct(values, q):
+    """The q-th quantile of the non-null values."""
     values = sorted(v for v in values if v is not None)
     if not values:
         return None
@@ -39,6 +41,7 @@ def _pct(values, q):
 
 
 def _agg(values, how):
+    """Sum, p50, p95 or mean of the non-null values."""
     vals = [v for v in values if v is not None]
     if how == "sum":
         return sum(vals)
@@ -50,6 +53,7 @@ def _agg(values, how):
 
 
 def _fmt(v):
+    """Format a number for a table cell."""
     if v is None:
         return "-"
     if v == 0:
@@ -60,6 +64,7 @@ def _fmt(v):
 
 
 def _table(headers, rows) -> str:
+    """Render rows as a Markdown table."""
     out = ["| " + " | ".join(headers) + " |", "|" + "|".join("---" for _ in headers) + "|"]
     out += ["| " + " | ".join(_fmt(c) if not isinstance(c, str) else c for c in r) + " |" for r in rows]
     return "\n".join(out)
@@ -87,6 +92,7 @@ def _content_ok(t: dict) -> Optional[int]:
 
 
 def collect(run_dir: Path):
+    """Load turn, call and tool rows from every run under run_dir."""
     turn_rows, call_rows, tool_rows = [], [], []
     for sub in sorted(p for p in run_dir.iterdir() if p.is_dir()):
         turns = _jsonl(sub / "turns.jsonl")
@@ -171,6 +177,7 @@ def collect(run_dir: Path):
 
 
 def _write_csv(path: Path, rows):
+    """Write rows to a CSV, with the union of their keys as columns."""
     if not rows:
         return
     fields = list(dict.fromkeys(k for r in rows for k in r))
@@ -181,6 +188,7 @@ def _write_csv(path: Path, rows):
 
 
 def _rollup(rows, key):
+    """Table of per-group metrics, grouped by the given key."""
     groups = defaultdict(list)
     for r in rows:
         groups[r[key]].append(r)
@@ -203,6 +211,7 @@ def _rollup(rows, key):
 
 
 def main() -> None:
+    """Print the report tables for a run directory."""
     run_dir = Path(sys.argv[1])
     turn_rows, call_rows, tool_rows = collect(run_dir)
     if not turn_rows:

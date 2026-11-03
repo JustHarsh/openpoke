@@ -51,8 +51,8 @@ def _render_conversation_history(transcript: str) -> str:
     return f"<conversation_history>\n{history}\n</conversation_history>"
 
 
-# Format currently active execution agents into XML tags for LLM awareness
 def _render_active_agents(latest_text: str) -> str:
+    """Render the roster for the prompt: all agents, or the top k under the topk variant."""
     roster = get_agent_roster()
     roster.load()
     agents = roster.get_agents()

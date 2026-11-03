@@ -30,8 +30,8 @@ class ExecutionAgentRuntime:
 
     MAX_TOOL_ITERATIONS = 8
 
-    # Initialize execution agent runtime with settings, tools, and agent instance
     def __init__(self, agent_name: str, task_id: Optional[int] = None):
+        """Set up the agent, its tools and, in task mode, the task-gated registry."""
         settings = get_settings()
         self.agent = ExecutionAgent(agent_name)
         self.api_key = settings.openrouter_api_key

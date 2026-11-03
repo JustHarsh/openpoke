@@ -42,11 +42,12 @@ SCHEMA = {
 
 
 def get_schemas() -> List[Dict[str, Any]]:
+    """Return the filter_emails tool schema."""
     return [SCHEMA]
 
 
-# Fetch with a smaller page if Composio rejects the payload as too large
 def _fetch(query: str, user_id: str) -> List[ProcessedEmail]:
+    """Fetch emails for a Gmail query, halving the page size when Composio returns a 413."""
     size = MAX_FETCH
     while True:
         args = {"query": query, "max_results": size, "include_payload": True, "verbose": True, "format": "full",
@@ -61,11 +62,13 @@ def _fetch(query: str, user_id: str) -> List[ProcessedEmail]:
 
 
 def _line(number: int, email: ProcessedEmail) -> str:
+    """One numbered line per email for the judge prompt."""
     body = " ".join(email.clean_text.split())[:BODY_FOR_JUDGE]
     return f"{number} | {email.sender} | {email.subject} | {email.timestamp:%Y-%m-%d %H:%M} | {body}"
 
 
 async def _judge(criterion: str, emails: List[ProcessedEmail]) -> List[ProcessedEmail]:
+    """Ask the cheap model which of the emails match the criterion."""
     response = await request_chat_completion(
         model=get_settings().email_filter_model,
         system=_SYSTEM,
@@ -109,4 +112,5 @@ async def filter_emails(criterion: str, within: Optional[str] = None, query: Opt
 
 
 def build_registry(agent_name: str) -> Dict[str, Callable[..., Any]]:  # noqa: ARG001
+    """Register filter_emails for a worker."""
     return {"filter_emails": filter_emails}

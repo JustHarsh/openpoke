@@ -8,10 +8,12 @@ from .openrouter_client.usage import USAGE_LOG_PATH
 
 
 def _n(v):
+    """Treat None as 0."""
     return v or 0
 
 
 def main() -> None:
+    """Print usage by purpose and by request."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--last", type=int, default=10, help="show the last N chat requests")
     args = ap.parse_args()
@@ -21,6 +23,7 @@ def main() -> None:
     rows = [json.loads(l) for l in USAGE_LOG_PATH.read_text().splitlines() if l.strip()]
 
     def agg(key):
+        """Group the rows by key into totals: calls, tokens, cost and latency."""
         out = defaultdict(lambda: [0, 0, 0, 0.0, 0])
         for r in rows:
             a = out[key(r)]
@@ -32,6 +35,7 @@ def main() -> None:
         return out
 
     def show(title, data, keys):
+        """Print one table for the chosen keys."""
         print(f"\n{title}\n{'':2}{'key':<28}{'calls':>6}{'in':>9}{'out':>8}{'cost$':>10}{'avg ms':>8}")
         for k in keys:
             c, i, o, cost, lat = data[k]

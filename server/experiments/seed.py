@@ -33,6 +33,7 @@ _CITIES = ["Tokyo", "Lisbon", "Montreal", "Berlin", "Austin", "Seoul"]
 
 
 def _candidates(rng: random.Random):
+    """Yield (agent name, instruction, result) candidates for seeded history."""
     for f in _FIRST:
         for l in _LAST:
             yield (f"Email to {f} {l}", f"Email {f} {l} about the schedule.", f"Sent to {f.lower()}.{l.lower()}@example.com.")

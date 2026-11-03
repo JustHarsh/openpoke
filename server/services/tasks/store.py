@@ -39,10 +39,12 @@ class Task:
 
 
 def _now() -> str:
+    """Current UTC time as an ISO string."""
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _row_to_task(row: sqlite3.Row) -> Task:
+    """Build a Task from a database row."""
     return Task(
         id=row["id"], kind=row["kind"], status=row["status"], entities=json.loads(row["entities"]),
         thread_id=row["thread_id"], data=json.loads(row["data"]), summary=row["summary"],
@@ -54,6 +56,7 @@ class TaskStore:
     """Thread-safe wrapper around a single SQLite file."""
 
     def __init__(self, path: Path):
+        """Open (or create) the SQLite file and the tasks table."""
         path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
@@ -62,7 +65,6 @@ class TaskStore:
             self._conn.execute(_SCHEMA)
             self._conn.commit()
 
-    # Insert a task in its kind's initial status
     def create(
         self,
         kind: str,
@@ -71,6 +73,7 @@ class TaskStore:
         thread_id: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
     ) -> Task:
+        """Insert a task in its kind's initial status."""
         if kind not in KINDS:
             raise ValueError(f"kind must be one of {KINDS}, got {kind!r}")
         with self._lock:
@@ -84,12 +87,13 @@ class TaskStore:
         return self.get(task_id)
 
     def get(self, task_id: int) -> Optional[Task]:
+        """Return the task with this id, or None."""
         with self._lock:
             row = self._conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return _row_to_task(row) if row else None
 
-    # Newest first; optional filters
     def list_tasks(self, kind: Optional[str] = None, status: Optional[str] = None, limit: int = 100) -> List[Task]:
+        """Return tasks newest first, optionally filtered by kind and status."""
         clauses, params = [], []
         if kind:
             clauses.append("kind = ?")
@@ -104,7 +108,6 @@ class TaskStore:
             ).fetchall()
         return [_row_to_task(r) for r in rows]
 
-    # Update content fields only; status changes go through transitions.advance
     def update_fields(
         self,
         task_id: int,
@@ -113,6 +116,7 @@ class TaskStore:
         thread_id: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
     ) -> Optional[Task]:
+        """Update content fields (not status) and return the task."""
         sets, params = [], []
         for column, value, encode in (
             ("summary", summary, None), ("entities", entities, json.dumps),
@@ -129,8 +133,8 @@ class TaskStore:
                 self._conn.commit()
         return self.get(task_id)
 
-    # Raw status write: callers must go through transitions.advance
     def set_status(self, task_id: int, status: str) -> Optional[Task]:
+        """Write a status without checking it; use transitions.advance."""
         with self._lock:
             self._conn.execute("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?", (status, _now(), task_id))
             self._conn.commit()

@@ -7,6 +7,7 @@ _STOPWORDS = {"email", "to", "the", "a", "an", "of", "about", "for", "and", "rep
 
 
 def _tokens(text: str) -> set:
+    """Lowercase word tokens of the text, without stopwords."""
     return {t for t in re.findall(r"[a-z0-9]+", text.lower()) if t not in _STOPWORDS}
 
 

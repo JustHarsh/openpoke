@@ -22,6 +22,7 @@ EXAMPLES = "'15 minutes', '3h', '2 days', 'last hour', 'today', 'yesterday', 'th
 
 
 def _epoch(dt: datetime) -> int:
+    """Unix seconds for a datetime."""
     return int(dt.timestamp())
 
 

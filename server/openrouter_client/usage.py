@@ -27,6 +27,7 @@ _lock = threading.Lock()
 
 
 def new_request_id() -> str:
+    """Return a short id for one chat request."""
     return uuid.uuid4().hex[:8]
 
 

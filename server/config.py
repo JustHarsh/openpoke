@@ -83,6 +83,7 @@ class Settings(BaseModel):
     @field_validator("variant")
     @classmethod
     def _check_variant(cls, value: str) -> str:
+        """Reject a variant that is not baseline, topk or redesign."""
         if value not in VARIANTS:
             raise ValueError(f"variant must be one of {VARIANTS}, got {value!r}")
         return value

@@ -287,7 +287,6 @@ class InteractionAgentRuntime:
 
         return {}, f"unsupported argument type: {type(raw_arguments).__name__}"
 
-    # Execute tool calls with error handling and logging, returning standardized results
     async def _execute_tool(self, tool_call: _ToolCall) -> ToolResult:
         """Execute a tool call and convert low-level errors into structured results."""
 

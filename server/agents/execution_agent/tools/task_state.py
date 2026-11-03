@@ -19,8 +19,8 @@ You are a short-lived worker. Everything that persists about this work lives in 
 - To find emails by meaning within a time range (job-related, about a trip, urgent, or a summary of recent mail) use `filter_emails`: it is much cheaper than `task_email_search`, which is for finding a specific known email."""
 
 
-# Render the task record as context for the subagent's system prompt
 def render_task_context(task: Task) -> str:
+    """Render the task record, rules and current time for the worker's system prompt."""
     record = {
         "id": task.id, "kind": task.kind, "status": task.status, "entities": task.entities,
         "thread_id": task.thread_id, "summary": task.summary, "data": task.data,
@@ -30,6 +30,7 @@ def render_task_context(task: Task) -> str:
 
 
 def get_schemas() -> List[Dict[str, Any]]:
+    """Return the update_task and set_task_status tool schemas."""
     return [
         {
             "type": "function",
@@ -64,8 +65,8 @@ def get_schemas() -> List[Dict[str, Any]]:
     ]
 
 
-# Add the record tools and gate the send tools for one task
 def build_registry(store: TaskStore, task_id: int, base: Dict[str, Callable[..., Any]]) -> Dict[str, Callable[..., Any]]:
+    """Return the base registry plus the task tools, with the send tools gated."""
     registry = dict(base)
 
     def update_task(
@@ -74,18 +75,22 @@ def build_registry(store: TaskStore, task_id: int, base: Dict[str, Callable[...,
         thread_id: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """Update the task record; data is merged into what is stored."""
         merged = {**store.get(task_id).data, **data} if data is not None else None
         task = store.update_fields(task_id, summary=summary, entities=entities, thread_id=thread_id, data=merged)
         return {"id": task.id, "status": task.status, "summary": task.summary}
 
     def set_task_status(status: str) -> Dict[str, Any]:
+        """Move the task to a new status; 'sent' is reserved for the system."""
         if status == "sent":
             raise PermissionError("'sent' is set by the system after a confirmed send")
         task = enter_pending_approval(store, task_id) if status == "pending_approval" else advance(store, task_id, status)
         return {"id": task.id, "status": task.status}
 
     def gated(send: Callable[..., Any]) -> Callable[..., Any]:
+        """Wrap a send tool so it runs only when the approval gate allows it."""
         def wrapper(**kwargs: Any) -> Any:
+            """Check the gate, send, then mark the task sent."""
             allowed, reason = check_can_send(store.get(task_id))
             if not allowed:
                 raise PermissionError(reason)

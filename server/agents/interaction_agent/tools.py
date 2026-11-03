@@ -150,10 +150,10 @@ SEND_TO_TASK_WORKER_SCHEMA = {
 _EXECUTION_BATCH_MANAGER = ExecutionBatchManager()
 
 
-# Create or continue a stored task and run an ephemeral worker on it (redesign variant)
 def _send_to_task_worker(
     instructions: str, task_id: Optional[int] = None, kind: Optional[str] = None, title: Optional[str] = None
 ) -> ToolResult:
+    """Create or continue a stored task and run a short-lived worker on it (redesign)."""
     store = get_task_store()
     if task_id is not None:
         task = store.get(task_id)
@@ -170,6 +170,7 @@ def _send_to_task_worker(
     logger.info(f"{'Created' if is_new else 'Continued'} task {task.id} ({task.kind})")
 
     async def _execute_async() -> None:
+        """Run the worker in the background and log how it ended."""
         try:
             result = await _EXECUTION_BATCH_MANAGER.execute_agent(worker, instructions, task_id=task.id)
             logger.info(f"Worker '{worker}' completed: {'SUCCESS' if result.success else 'FAILED'}")
@@ -188,7 +189,6 @@ def _send_to_task_worker(
     )
 
 
-# Create or reuse execution agent and dispatch instructions asynchronously
 def send_message_to_agent(
     agent_name: Optional[str] = None,
     instructions: str = "",
@@ -215,6 +215,7 @@ def send_message_to_agent(
     logger.info(f"{action} agent: {agent_name}")
 
     async def _execute_async() -> None:
+        """Run the named agent in the background and log how it ended."""
         try:
             result = await _EXECUTION_BATCH_MANAGER.execute_agent(agent_name, instructions)
             status = "SUCCESS" if result.success else "FAILED"
@@ -279,7 +280,6 @@ def send_draft(
     )
 
 
-# Look up stored tasks relevant to a message; flags ambiguity so the agent can ask the user
 async def find_tasks_tool(query: str, kind: Optional[str] = None) -> ToolResult:
     """Return the best-matching stored tasks, best first (chosen by one cheap LLM call)."""
     try:
@@ -322,7 +322,6 @@ def wait(reason: str) -> ToolResult:
     )
 
 
-# Return predefined tool schemas for LLM function calling
 def get_tool_schemas():
     """Return OpenAI-compatible tool schemas."""
     if get_settings().variant == "redesign":

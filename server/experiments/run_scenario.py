@@ -32,6 +32,7 @@ async def _drain(timeout: float) -> bool:
 
 
 async def main(scenario_id: str, out_dir: Path, turn_timeout: float) -> None:
+    """Run one scenario against the app and write its turns to out_dir."""
     scenario = next(s for s in json.loads(SCENARIOS.read_text()) if s["id"] == scenario_id)
 
     replies: list = []  # (monotonic_time, kind, text) for everything shown to the user
@@ -39,6 +40,7 @@ async def main(scenario_id: str, out_dir: Path, turn_timeout: float) -> None:
         original = getattr(interaction_tools, name)
 
         def wrapper(*args, _orig=original, _name=name, **kwargs):
+            """Record what is shown to the user, then call the original tool."""
             result = _orig(*args, **kwargs)
             replies.append((time.monotonic(), _name, result.user_message or json.dumps(kwargs)[:2000]))
             return result
